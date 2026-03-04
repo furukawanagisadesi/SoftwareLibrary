@@ -1,0 +1,16 @@
+D:\CSharp\WorkProject\SoftwareLibrary_WinForm\Bootstrap\Bootstrap\bin\Debug\net8.0-windows\Bootstrap.exe
+D:\CSharp\WorkProject\SoftwareLibrary_WinForm\Bootstrap\Bootstrap\bin\Debug\net8.0-windows\Bootstrap.deps.json
+D:\CSharp\WorkProject\SoftwareLibrary_WinForm\Bootstrap\Bootstrap\bin\Debug\net8.0-windows\Bootstrap.runtimeconfig.json
+D:\CSharp\WorkProject\SoftwareLibrary_WinForm\Bootstrap\Bootstrap\bin\Debug\net8.0-windows\Bootstrap.dll
+D:\CSharp\WorkProject\SoftwareLibrary_WinForm\Bootstrap\Bootstrap\bin\Debug\net8.0-windows\Bootstrap.pdb
+D:\CSharp\WorkProject\SoftwareLibrary_WinForm\Bootstrap\Bootstrap\obj\Debug\net8.0-windows\Bootstrap.ProgressForm.resources
+D:\CSharp\WorkProject\SoftwareLibrary_WinForm\Bootstrap\Bootstrap\obj\Debug\net8.0-windows\Bootstrap.csproj.GenerateResource.cache
+D:\CSharp\WorkProject\SoftwareLibrary_WinForm\Bootstrap\Bootstrap\obj\Debug\net8.0-windows\Bootstrap.GeneratedMSBuildEditorConfig.editorconfig
+D:\CSharp\WorkProject\SoftwareLibrary_WinForm\Bootstrap\Bootstrap\obj\Debug\net8.0-windows\Bootstrap.AssemblyInfoInputs.cache
+D:\CSharp\WorkProject\SoftwareLibrary_WinForm\Bootstrap\Bootstrap\obj\Debug\net8.0-windows\Bootstrap.AssemblyInfo.cs
+D:\CSharp\WorkProject\SoftwareLibrary_WinForm\Bootstrap\Bootstrap\obj\Debug\net8.0-windows\Bootstrap.csproj.CoreCompileInputs.cache
+D:\CSharp\WorkProject\SoftwareLibrary_WinForm\Bootstrap\Bootstrap\obj\Debug\net8.0-windows\Bootstrap.dll
+D:\CSharp\WorkProject\SoftwareLibrary_WinForm\Bootstrap\Bootstrap\obj\Debug\net8.0-windows\refint\Bootstrap.dll
+D:\CSharp\WorkProject\SoftwareLibrary_WinForm\Bootstrap\Bootstrap\obj\Debug\net8.0-windows\Bootstrap.pdb
+D:\CSharp\WorkProject\SoftwareLibrary_WinForm\Bootstrap\Bootstrap\obj\Debug\net8.0-windows\Bootstrap.genruntimeconfig.cache
+D:\CSharp\WorkProject\SoftwareLibrary_WinForm\Bootstrap\Bootstrap\obj\Debug\net8.0-windows\ref\Bootstrap.dll

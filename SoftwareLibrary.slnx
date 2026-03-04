@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="Bootstrap/Bootstrap/Bootstrap.csproj" />
+  <Project Path="SoftwareManager/SoftwareManager/SoftwareManager.csproj" />
+  <Project Path="SoftwareServer/SoftwareServer/SoftwareServer.csproj" />
+  <Project Path="Updater/Updater/Updater.csproj" />
+</Solution>

@@ -1,0 +1,16 @@
+D:\CSharp\WorkProject\SoftwareLibrary_WinForm\SoftwareManager\SoftwareManager\bin\Debug\net8.0-windows\SoftwareManager.exe
+D:\CSharp\WorkProject\SoftwareLibrary_WinForm\SoftwareManager\SoftwareManager\bin\Debug\net8.0-windows\SoftwareManager.deps.json
+D:\CSharp\WorkProject\SoftwareLibrary_WinForm\SoftwareManager\SoftwareManager\bin\Debug\net8.0-windows\SoftwareManager.runtimeconfig.json
+D:\CSharp\WorkProject\SoftwareLibrary_WinForm\SoftwareManager\SoftwareManager\bin\Debug\net8.0-windows\SoftwareManager.dll
+D:\CSharp\WorkProject\SoftwareLibrary_WinForm\SoftwareManager\SoftwareManager\bin\Debug\net8.0-windows\SoftwareManager.pdb
+D:\CSharp\WorkProject\SoftwareLibrary_WinForm\SoftwareManager\SoftwareManager\obj\Debug\net8.0-windows\SoftwareManager.MainForm.resources
+D:\CSharp\WorkProject\SoftwareLibrary_WinForm\SoftwareManager\SoftwareManager\obj\Debug\net8.0-windows\SoftwareManager.csproj.GenerateResource.cache
+D:\CSharp\WorkProject\SoftwareLibrary_WinForm\SoftwareManager\SoftwareManager\obj\Debug\net8.0-windows\SoftwareManager.GeneratedMSBuildEditorConfig.editorconfig
+D:\CSharp\WorkProject\SoftwareLibrary_WinForm\SoftwareManager\SoftwareManager\obj\Debug\net8.0-windows\SoftwareManager.AssemblyInfoInputs.cache
+D:\CSharp\WorkProject\SoftwareLibrary_WinForm\SoftwareManager\SoftwareManager\obj\Debug\net8.0-windows\SoftwareManager.AssemblyInfo.cs
+D:\CSharp\WorkProject\SoftwareLibrary_WinForm\SoftwareManager\SoftwareManager\obj\Debug\net8.0-windows\SoftwareManager.csproj.CoreCompileInputs.cache
+D:\CSharp\WorkProject\SoftwareLibrary_WinForm\SoftwareManager\SoftwareManager\obj\Debug\net8.0-windows\SoftwareManager.dll
+D:\CSharp\WorkProject\SoftwareLibrary_WinForm\SoftwareManager\SoftwareManager\obj\Debug\net8.0-windows\refint\SoftwareManager.dll
+D:\CSharp\WorkProject\SoftwareLibrary_WinForm\SoftwareManager\SoftwareManager\obj\Debug\net8.0-windows\SoftwareManager.pdb
+D:\CSharp\WorkProject\SoftwareLibrary_WinForm\SoftwareManager\SoftwareManager\obj\Debug\net8.0-windows\SoftwareManager.genruntimeconfig.cache
+D:\CSharp\WorkProject\SoftwareLibrary_WinForm\SoftwareManager\SoftwareManager\obj\Debug\net8.0-windows\ref\SoftwareManager.dll
