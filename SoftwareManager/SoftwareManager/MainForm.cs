@@ -15,6 +15,10 @@ namespace SoftwareManager
         {
             InitializeComponent();
 
+            // 修复按钮位置随窗口宽度变化
+            toolbar.Resize += (_, _) => RepositionToolbarButtons();
+            RepositionToolbarButtons();
+
             // 列表列
             _listView.Columns.Add("软件名称", 200);
             _listView.Columns.Add("已安装版本", 110);
@@ -281,6 +285,15 @@ namespace SoftwareManager
                 Cursor = Cursors.Hand,
                 Font = new Font("Microsoft YaHei", 9f),
             };
+        }
+
+        private void RepositionToolbarButtons()
+        {
+            btnSettings.Location = new Point(toolbar.Width - btnSettings.Width - 12, 9);
+            _btnRefresh.Location = new Point(
+                toolbar.Width - btnSettings.Width - _btnRefresh.Width - 24,
+                9
+            );
         }
     }
 }
