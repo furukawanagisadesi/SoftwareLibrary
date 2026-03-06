@@ -1,0 +1,17 @@
+D:\CSharp\WorkProject\SoftwareLibrary\Bootstrap\Bootstrap\bin\Release\net8.0-windows\win-x64\Bootstrap.exe
+D:\CSharp\WorkProject\SoftwareLibrary\Bootstrap\Bootstrap\bin\Release\net8.0-windows\win-x64\Bootstrap.deps.json
+D:\CSharp\WorkProject\SoftwareLibrary\Bootstrap\Bootstrap\bin\Release\net8.0-windows\win-x64\Bootstrap.runtimeconfig.json
+D:\CSharp\WorkProject\SoftwareLibrary\Bootstrap\Bootstrap\bin\Release\net8.0-windows\win-x64\Bootstrap.dll
+D:\CSharp\WorkProject\SoftwareLibrary\Bootstrap\Bootstrap\bin\Release\net8.0-windows\win-x64\Bootstrap.pdb
+D:\CSharp\WorkProject\SoftwareLibrary\Bootstrap\Bootstrap\obj\Release\net8.0-windows\win-x64\Bootstrap.ProgressForm.resources
+D:\CSharp\WorkProject\SoftwareLibrary\Bootstrap\Bootstrap\obj\Release\net8.0-windows\win-x64\Bootstrap.csproj.GenerateResource.cache
+D:\CSharp\WorkProject\SoftwareLibrary\Bootstrap\Bootstrap\obj\Release\net8.0-windows\win-x64\Bootstrap.GeneratedMSBuildEditorConfig.editorconfig
+D:\CSharp\WorkProject\SoftwareLibrary\Bootstrap\Bootstrap\obj\Release\net8.0-windows\win-x64\Bootstrap.AssemblyInfoInputs.cache
+D:\CSharp\WorkProject\SoftwareLibrary\Bootstrap\Bootstrap\obj\Release\net8.0-windows\win-x64\Bootstrap.AssemblyInfo.cs
+D:\CSharp\WorkProject\SoftwareLibrary\Bootstrap\Bootstrap\obj\Release\net8.0-windows\win-x64\Bootstrap.csproj.CoreCompileInputs.cache
+D:\CSharp\WorkProject\SoftwareLibrary\Bootstrap\Bootstrap\obj\Release\net8.0-windows\win-x64\Bootstrap.sourcelink.json
+D:\CSharp\WorkProject\SoftwareLibrary\Bootstrap\Bootstrap\obj\Release\net8.0-windows\win-x64\Bootstrap.dll
+D:\CSharp\WorkProject\SoftwareLibrary\Bootstrap\Bootstrap\obj\Release\net8.0-windows\win-x64\refint\Bootstrap.dll
+D:\CSharp\WorkProject\SoftwareLibrary\Bootstrap\Bootstrap\obj\Release\net8.0-windows\win-x64\Bootstrap.pdb
+D:\CSharp\WorkProject\SoftwareLibrary\Bootstrap\Bootstrap\obj\Release\net8.0-windows\win-x64\Bootstrap.genruntimeconfig.cache
+D:\CSharp\WorkProject\SoftwareLibrary\Bootstrap\Bootstrap\obj\Release\net8.0-windows\win-x64\ref\Bootstrap.dll

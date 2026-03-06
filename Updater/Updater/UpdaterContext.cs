@@ -346,6 +346,12 @@ namespace Updater
                 $"installPath: {installPath}\nexeName: {exeName}\nexePath: {exePath}\nTime: {DateTime.Now}"
             );
 
+            // 显示启动画面
+            var splash = new UpdateForm(Path.GetFileNameWithoutExtension(exeName));
+            splash.Show();
+            splash.SetProgress(50, "正在启动...");
+            Application.DoEvents();
+
             Process.Start(
                 new ProcessStartInfo(exePath)
                 {
@@ -353,6 +359,11 @@ namespace Updater
                     WorkingDirectory = installPath,
                 }
             );
+
+            splash.SetProgress(100, "启动完成");
+            Task.Delay(800).Wait();
+            splash.Close();
+
             Application.Exit();
         }
 

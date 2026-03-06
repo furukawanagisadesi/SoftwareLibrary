@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "dgSpecHash": "L74fT0OO7Rk=",
+  "success": true,
+  "projectFilePath": "D:\\CSharp\\WorkProject\\SoftwareLibrary\\Bootstrap\\Bootstrap\\Bootstrap.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\Administrator\\.nuget\\packages\\microsoft.net.illink.tasks\\8.0.24\\microsoft.net.illink.tasks.8.0.24.nupkg.sha512"
+  ],
+  "logs": []
+}
