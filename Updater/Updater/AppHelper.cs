@@ -4,7 +4,7 @@ namespace Updater
 {
     static class AppHelper
     {
-        public static string ServerUrl = "http://192.168.16.52:15000";
+        public static string ServerUrl = "http://127.0.0.1:15000";
         public static string InstallRoot = @"D:\SoftwareManager\apps";
         public static readonly string UpdaterDir = @"D:\SoftwareManager";
 

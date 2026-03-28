@@ -64,8 +64,8 @@ namespace Bootstrap
                 if (!string.Equals(selfPath, bootstrapDest, StringComparison.OrdinalIgnoreCase))
                     File.Copy(selfPath, bootstrapDest, overwrite: true);
 
-                var iniSrc = Path.Combine(selfDir, "config.ini");
-                var iniDest = Path.Combine(AppHelper.InstallDir, "config.ini");
+                var iniSrc = Path.Combine(selfDir, "config.json");
+                var iniDest = Path.Combine(AppHelper.InstallDir, "config.json");
                 if (
                     File.Exists(iniSrc)
                     && !string.Equals(iniSrc, iniDest, StringComparison.OrdinalIgnoreCase)

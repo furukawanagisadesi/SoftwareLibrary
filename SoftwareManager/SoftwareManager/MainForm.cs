@@ -200,7 +200,7 @@ namespace SoftwareManager
             var form = new Form
             {
                 Text = "设置",
-                Size = new Size(420, 200),
+                Size = new Size(420, 250),
                 StartPosition = FormStartPosition.CenterParent,
                 FormBorderStyle = FormBorderStyle.FixedDialog,
                 MaximizeBox = false,
@@ -236,12 +236,19 @@ namespace SoftwareManager
             var btnSave = new Button
             {
                 Text = "保存",
-                Location = new Point(270, 135),
                 Width = 110,
+                Height = 30,
+                Anchor = AnchorStyles.Bottom | AnchorStyles.Right,
                 BackColor = Color.FromArgb(26, 110, 232),
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
             };
+
+            // 位置让窗体自己算
+            btnSave.Location = new Point(
+                form.ClientSize.Width - btnSave.Width - 16,
+                form.ClientSize.Height - btnSave.Height - 16
+            );
             btnSave.Click += (_, _) =>
             {
                 _config.ServerUrl = txtUrl.Text.TrimEnd('/');

@@ -9,7 +9,7 @@ public class AppConfig
         "config.json"
     );
 
-    public string ServerUrl { get; set; } = "http://0.0.0.0:15000";
+    public string ServerUrl { get; set; } = "http://127.0.0.1:15000";
     public string InstallRoot { get; set; } = @"D:\SoftwareManager\apps";
 
     public static AppConfig Load()

@@ -8,32 +8,35 @@ namespace Bootstrap
         public static readonly string InstallDir = @"D:\SoftwareManager";
         public static readonly string UpdaterPath = Path.Combine(InstallDir, "Updater.exe");
         public static readonly string ConfigPath = Path.Combine(InstallDir, "config.json");
-        public static string ServerUrl = "http://192.168.16.52:15000";
+        public static string ServerUrl = "http://127.0.0.1:15000";
 
         public static void LoadConfig()
         {
             var paths = new[]
             {
-                Path.Combine(AppContext.BaseDirectory, "config.ini"),
-                Path.Combine(InstallDir, "config.ini"),
+                Path.Combine(AppContext.BaseDirectory, "config.json"),
+                ConfigPath, // D:\SoftwareManager\config.json
             };
 
-            foreach (var iniPath in paths)
+            foreach (var jsonPath in paths)
             {
-                if (!File.Exists(iniPath))
+                if (!File.Exists(jsonPath))
                     continue;
-                foreach (var line in File.ReadAllLines(iniPath))
+                try
                 {
-                    var parts = line.Split('=', 2);
-                    if (
-                        parts.Length == 2
-                        && parts[0].Trim().Equals("ServerUrl", StringComparison.OrdinalIgnoreCase)
-                    )
+                    var text = File.ReadAllText(jsonPath);
+                    using var doc = JsonDocument.Parse(text);
+                    if (doc.RootElement.TryGetProperty("serverUrl", out var el))
                     {
-                        ServerUrl = parts[1].Trim().TrimEnd('/');
-                        return;
+                        var val = el.GetString();
+                        if (!string.IsNullOrWhiteSpace(val))
+                        {
+                            ServerUrl = val.TrimEnd('/');
+                            return;
+                        }
                     }
                 }
+                catch { }
             }
         }
 

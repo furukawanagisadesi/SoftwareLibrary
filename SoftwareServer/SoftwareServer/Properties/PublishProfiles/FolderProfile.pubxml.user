@@ -2,8 +2,8 @@
 <!-- https://go.microsoft.com/fwlink/?LinkID=208121. -->
 <Project>
   <PropertyGroup>
-    <_PublishTargetUrl>D:\CSharp\WorkProject\SoftwareLibrary\SoftwareServer\SoftwareServer\bin\Release\net8.0\publish\</_PublishTargetUrl>
-    <History>True|2026-03-27T05:55:14.1829277Z||;</History>
+    <_PublishTargetUrl>D:\CSharp\SoftwareLibrary-main\SoftwareServer\SoftwareServer\bin\Release\net8.0\publish\</_PublishTargetUrl>
+    <History>True|2026-03-28T04:03:26.8958775Z||;True|2026-03-27T13:55:14.1829277+08:00||;</History>
     <LastFailureDetails />
   </PropertyGroup>
 </Project>
