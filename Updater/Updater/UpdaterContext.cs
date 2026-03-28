@@ -35,7 +35,7 @@ namespace Updater
 
             if (_offline)
             {
-                LaunchApp(installPath, "", appId);
+                await LaunchApp(installPath, "", appId);
                 return;
             }
 
@@ -52,7 +52,7 @@ namespace Updater
             }
             catch
             {
-                LaunchApp(installPath, localVersion, appId);
+                await LaunchApp(installPath, localVersion, appId);
                 return;
             }
 
@@ -70,7 +70,7 @@ namespace Updater
 
             if (localVersion == serverInfo.Version && Directory.Exists(installPath))
             {
-                LaunchApp(installPath, serverInfo.ExeName, appId);
+                await LaunchApp(installPath, serverInfo.ExeName, appId);
                 return;
             }
 
@@ -87,7 +87,7 @@ namespace Updater
                 if (appId == "softwaremanager")
                     CreateSoftwareManagerShortcut(installPath, serverInfo.ExeName);
 
-                LaunchApp(installPath, serverInfo.ExeName, appId);
+                await LaunchApp(installPath, serverInfo.ExeName, appId);
             }
             catch (Exception ex)
             {
@@ -106,7 +106,7 @@ namespace Updater
                         Application.Exit();
                         return;
                     }
-                    LaunchApp(installPath, serverInfo.ExeName, appId);
+                    await LaunchApp(installPath, serverInfo.ExeName, appId);
                     return;
                 }
 
@@ -138,7 +138,7 @@ namespace Updater
 
                     if (result == DialogResult.Yes)
                     {
-                        LaunchApp(installPath, serverInfo.ExeName, appId);
+                        await LaunchApp(installPath, serverInfo.ExeName, appId);
                     }
                     else if (result == DialogResult.Cancel)
                     {
@@ -172,7 +172,7 @@ namespace Updater
                             File.WriteAllText(versionFile, serverInfo.Version);
                             UpdateInstalledRecord(appId, serverInfo.Version, installPath);
                             form2.Close();
-                            LaunchApp(installPath, serverInfo.ExeName, appId);
+                            await LaunchApp(installPath, serverInfo.ExeName, appId);
                         }
                         catch (Exception ex2)
                         {
@@ -293,7 +293,7 @@ namespace Updater
             await Task.Delay(300);
         }
 
-        void LaunchApp(string installPath, string exeName, string appId)
+        async Task LaunchApp(string installPath, string exeName, string appId)
         {
             if (!Directory.Exists(installPath))
             {
@@ -350,7 +350,6 @@ namespace Updater
             var splash = new UpdateForm(Path.GetFileNameWithoutExtension(exeName));
             splash.Show();
             splash.SetProgress(50, "正在启动...");
-            Application.DoEvents();
 
             Process.Start(
                 new ProcessStartInfo(exePath)
@@ -361,7 +360,7 @@ namespace Updater
             );
 
             splash.SetProgress(100, "启动完成");
-            Task.Delay(800).Wait();
+            await Task.Delay(800); // ← 不阻塞UI线程
             splash.Close();
 
             Application.Exit();

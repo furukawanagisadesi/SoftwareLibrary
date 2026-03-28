@@ -1,0 +1,5 @@
+D:\CSharp\WorkProject\SoftwareLibrary\Updater\Updater\bin\Release\net8.0-windows\publish\Updater.exe
+D:\CSharp\WorkProject\SoftwareLibrary\Updater\Updater\bin\Release\net8.0-windows\publish\Updater.dll
+D:\CSharp\WorkProject\SoftwareLibrary\Updater\Updater\bin\Release\net8.0-windows\publish\Updater.deps.json
+D:\CSharp\WorkProject\SoftwareLibrary\Updater\Updater\bin\Release\net8.0-windows\publish\Updater.runtimeconfig.json
+D:\CSharp\WorkProject\SoftwareLibrary\Updater\Updater\bin\Release\net8.0-windows\publish\Updater.pdb

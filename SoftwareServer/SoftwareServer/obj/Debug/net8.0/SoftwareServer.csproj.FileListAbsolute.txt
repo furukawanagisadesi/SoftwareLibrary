@@ -69,10 +69,10 @@ D:\CSharp\WorkProject\SoftwareLibrary\SoftwareServer\SoftwareServer\obj\Debug\ne
 D:\CSharp\WorkProject\SoftwareLibrary\SoftwareServer\SoftwareServer\obj\Debug\net8.0\staticwebassets.development.json
 D:\CSharp\WorkProject\SoftwareLibrary\SoftwareServer\SoftwareServer\obj\Debug\net8.0\staticwebassets.build.endpoints.json
 D:\CSharp\WorkProject\SoftwareLibrary\SoftwareServer\SoftwareServer\obj\Debug\net8.0\swae.build.ex.cache
-D:\CSharp\WorkProject\SoftwareLibrary\SoftwareServer\SoftwareServer\obj\Debug\net8.0\staticwebassets.upToDateCheck.txt
 D:\CSharp\WorkProject\SoftwareLibrary\SoftwareServer\SoftwareServer\obj\Debug\net8.0\Software.4AC890E1.Up2Date
 D:\CSharp\WorkProject\SoftwareLibrary\SoftwareServer\SoftwareServer\obj\Debug\net8.0\SoftwareServer.dll
 D:\CSharp\WorkProject\SoftwareLibrary\SoftwareServer\SoftwareServer\obj\Debug\net8.0\refint\SoftwareServer.dll
 D:\CSharp\WorkProject\SoftwareLibrary\SoftwareServer\SoftwareServer\obj\Debug\net8.0\SoftwareServer.pdb
 D:\CSharp\WorkProject\SoftwareLibrary\SoftwareServer\SoftwareServer\obj\Debug\net8.0\SoftwareServer.genruntimeconfig.cache
 D:\CSharp\WorkProject\SoftwareLibrary\SoftwareServer\SoftwareServer\obj\Debug\net8.0\ref\SoftwareServer.dll
+D:\CSharp\WorkProject\SoftwareLibrary\SoftwareServer\SoftwareServer\bin\Debug\net8.0\dotnet-tools.json
