@@ -97,7 +97,12 @@ public class InstallService
         if (Directory.Exists(installPath))
             Directory.Delete(installPath, true);
         Directory.CreateDirectory(installPath);
-        ZipFile.ExtractToDirectory(tempZip, installPath);
+
+        System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
+        var gbk = System.Text.Encoding.GetEncoding("GBK");
+
+        ZipFile.ExtractToDirectory(tempZip, installPath, gbk);
+
         File.Delete(tempZip);
 
         // 解压完成后，先写一个临时标记
