@@ -177,7 +177,11 @@ namespace Bootstrap
                 var tempDir = Path.Combine(Path.GetTempPath(), $"updater_{info.Version}");
                 if (Directory.Exists(tempDir))
                     Directory.Delete(tempDir, true);
-                ZipFile.ExtractToDirectory(tempZip, tempDir);
+                ZipFile.ExtractToDirectory(
+                    tempZip,
+                    tempDir,
+                    System.Text.Encoding.GetEncoding("GBK")
+                );
                 File.Delete(tempZip);
 
                 form.SetProgress(95, "安装中...");

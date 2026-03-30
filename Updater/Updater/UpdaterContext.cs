@@ -243,7 +243,7 @@ namespace Updater
             if (Directory.Exists(tempDir))
                 Directory.Delete(tempDir, true);
             Directory.CreateDirectory(tempDir);
-            ZipFile.ExtractToDirectory(tempZip, tempDir);
+            ZipFile.ExtractToDirectory(tempZip, tempDir, System.Text.Encoding.GetEncoding("GBK"));
             File.Delete(tempZip);
 
             form.SetProgress(92, "安装中...");
