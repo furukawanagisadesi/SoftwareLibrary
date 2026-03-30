@@ -137,8 +137,7 @@ public class InstallService
     // 创建桌面快捷方式 → Launcher.exe --app=chrome
     private void CreateShortcut(SoftwarePackage pkg, string installPath)
     {
-        var updaterDir = Path.GetDirectoryName(_config.InstallRoot)!;
-        var bootstrapPath = Path.Combine(updaterDir, "Bootstrap.exe");
+        var bootstrapPath = Path.Combine(_config.BootstrapDir, "Bootstrap.exe");
         var desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
         var shortcutPath = Path.Combine(desktopPath, $"{pkg.Name}.lnk");
 

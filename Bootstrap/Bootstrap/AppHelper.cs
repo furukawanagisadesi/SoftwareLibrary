@@ -5,20 +5,19 @@ namespace Bootstrap
 {
     static class AppHelper
     {
-        public static string InstallDir = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "SoftwareLibrary"
-        );
-        public static readonly string UpdaterPath = Path.Combine(InstallDir, "Updater.exe");
-        public static readonly string ConfigPath = Path.Combine(InstallDir, "config.json");
         public static string ServerUrl = "http://127.0.0.1:15000";
+        public static string InstallDir = @"D:\SoftwareLibrary";
+        public static string InstallRoot = @"D:\SoftwareLibrary\apps";
+
+        public static string UpdaterPath => Path.Combine(InstallDir, "Updater.exe");
+        public static string ConfigPath => Path.Combine(InstallDir, "config.json");
 
         public static void LoadConfig()
         {
             var paths = new[]
             {
                 Path.Combine(AppContext.BaseDirectory, "config.json"),
-                ConfigPath, // D:\SoftwareLibrary\config.json
+                Path.Combine(InstallDir, "config.json"),
             };
 
             foreach (var jsonPath in paths)
@@ -29,15 +28,23 @@ namespace Bootstrap
                 {
                     var text = File.ReadAllText(jsonPath);
                     using var doc = JsonDocument.Parse(text);
-                    if (doc.RootElement.TryGetProperty("serverUrl", out var el))
+
+                    if (doc.RootElement.TryGetProperty("serverUrl", out var urlEl))
                     {
-                        var val = el.GetString();
+                        var val = urlEl.GetString();
                         if (!string.IsNullOrWhiteSpace(val))
-                        {
                             ServerUrl = val.TrimEnd('/');
-                            return;
-                        }
                     }
+
+                    if (doc.RootElement.TryGetProperty("installRoot", out var rootEl))
+                    {
+                        var val = rootEl.GetString();
+                        // 不为空才覆盖，为空就保持默认的 D:\SoftwareLibrary\apps
+                        if (!string.IsNullOrWhiteSpace(val))
+                            InstallRoot = val;
+                    }
+
+                    return;
                 }
                 catch { }
             }

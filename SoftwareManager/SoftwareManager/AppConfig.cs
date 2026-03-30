@@ -10,7 +10,8 @@ public class AppConfig
     );
 
     public string ServerUrl { get; set; } = "http://127.0.0.1:15000";
-    public string InstallRoot { get; set; } = @"D:\SoftwareManager\apps";
+    public string InstallRoot { get; set; } = @"D:\SoftwareLibrary\apps";
+    public string BootstrapDir { get; set; } = @"D:\SoftwareLibrary";
 
     public static AppConfig Load()
     {
@@ -21,7 +22,10 @@ public class AppConfig
             return def;
         }
         var json = File.ReadAllText(ConfigPath);
-        return JsonSerializer.Deserialize<AppConfig>(json) ?? new AppConfig();
+        return JsonSerializer.Deserialize<AppConfig>(
+                json,
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
+            ) ?? new AppConfig();
     }
 
     public void Save()

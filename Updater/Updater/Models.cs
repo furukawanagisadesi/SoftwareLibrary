@@ -12,7 +12,7 @@
     record UpdaterConfig
     {
         public string ServerUrl { get; init; } = "http://127.0.0.1:15000";
-        public string InstallRoot { get; init; } = @"D:\SoftwareManager\apps";
+        public string InstallRoot { get; init; } = @"D:\SoftwareLibrary\apps";
     }
 
     record InstalledRecord

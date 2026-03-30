@@ -27,6 +27,7 @@ namespace Updater
 
         async Task CheckUpdateAndLaunch(string appId)
         {
+            Directory.CreateDirectory(AppHelper.UpdaterDir);
             File.WriteAllText(Path.Combine(AppHelper.UpdaterDir, "error.log"), "");
 
             var installPath = Path.Combine(AppHelper.InstallRoot, appId);
