@@ -39,7 +39,16 @@ public class InstallService
         if (!File.Exists(_recordFile))
             return [];
         var json = File.ReadAllText(_recordFile);
-        return JsonSerializer.Deserialize<List<InstalledRecord>>(json) ?? [];
+        var records = JsonSerializer.Deserialize<List<InstalledRecord>>(json) ?? [];
+
+        // 过滤掉安装未完成的
+        return records
+            .Where(r =>
+            {
+                var mark = Path.Combine(r.InstallPath, ".installing");
+                return !File.Exists(mark);
+            })
+            .ToList();
     }
 
     // 下载并安装（解压）软件，progress 回调返回 0~100
@@ -91,13 +100,16 @@ public class InstallService
         ZipFile.ExtractToDirectory(tempZip, installPath);
         File.Delete(tempZip);
 
-        progress.Report((80, "创建快捷方式..."));
-
-        // 3. 创建桌面快捷方式（指向 Launcher.exe --app=id）
-        CreateShortcut(pkg, installPath);
+        // 解压完成后，先写一个临时标记
+        var tempMark = Path.Combine(installPath, ".installing");
+        File.WriteAllText(tempMark, "");
 
         // 解压成功后写入 version.txt，供 Updater 检查版本用
         File.WriteAllText(Path.Combine(installPath, "version.txt"), pkg.Version);
+
+        // 3. 创建桌面快捷方式（指向 Launcher.exe --app=id）
+        progress.Report((80, "创建快捷方式..."));
+        CreateShortcut(pkg, installPath);
 
         // 4. 记录安装信息
         progress.Report((95, "记录安装信息..."));
@@ -112,6 +124,9 @@ public class InstallService
         );
 
         progress.Report((100, "安装完成！"));
+
+        // 全部成功后才删除临时标记
+        File.Delete(tempMark);
     }
 
     // 卸载（删除目录 + 快捷方式 + 记录）

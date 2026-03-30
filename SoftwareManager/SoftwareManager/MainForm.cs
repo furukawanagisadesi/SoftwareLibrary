@@ -183,6 +183,13 @@ namespace SoftwareManager
                 _installedList = _service.GetInstalledRecords();
                 RenderList();
                 SetStatus($"已卸载 {pkg.Name}");
+
+                MessageBox.Show(
+                    $"「{pkg.Name}」已成功卸载。",
+                    "卸载完成",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information
+                );
             }
             catch (Exception ex)
             {
