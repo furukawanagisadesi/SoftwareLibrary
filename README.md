@@ -89,7 +89,7 @@ cd SoftwareServer
 dotnet run
 ```
 
-服务将启动在 `http://192.168.16.52:15000`
+服务将启动在 `http://0.0.0.0:15000`
 
 ### 运行客户端
 
@@ -112,7 +112,7 @@ dotnet run
   "Kestrel": {
     "Endpoints": {
       "Http": {
-        "Url": "http://192.168.16.52:15000"
+        "Url": "http://127.0.0.1:15000"
       }
     }
   }
@@ -152,8 +152,8 @@ dotnet publish -c Release -o ./publish
 ```
 
 2. **配置服务端**
-```bash
-# 修改 appsettings.Production.json
+修改 `appsettings.json`：
+```json
 {
   "Kestrel": {
     "Endpoints": {
@@ -161,7 +161,22 @@ dotnet publish -c Release -o ./publish
         "Url": "http://your-server-ip:port"
       }
     }
-  }
+  },
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+  "AllowedHosts": "*"
+}
+```
+
+修改 `config.json`：
+```json
+{
+    "ServerUrl": "http://your-server-ip:port",
+    "installRoot": "your-path"
 }
 ```
 

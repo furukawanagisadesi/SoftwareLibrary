@@ -1,4 +1,4 @@
 {
     "ServerUrl" : "http://127.0.0.1:15000",
-    "InstallRoot" : "D:\\SoftwareManager\\apps"
+    "installRoot": "D:\\SoftwareLibrary\\apps"
 }

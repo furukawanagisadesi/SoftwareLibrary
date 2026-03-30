@@ -44,47 +44,57 @@ public class SoftwareService
     }
 
     // 上传新软件包并发布版本
+    private readonly SemaphoreSlim _lock = new(1, 1);
+
     public async Task<SoftwarePackage> PublishAsync(
         string id,
         IFormFile zipFile,
         PublishRequest req
     )
     {
-        // 保存 zip 文件
-        var zipFileName = $"{id}_{req.Version}.zip";
-        var zipPath = Path.Combine(_packagesDir, zipFileName);
-        await using var stream = new FileStream(zipPath, FileMode.Create);
-        await zipFile.CopyToAsync(stream);
-
-        // 更新清单
-        var list = GetAll();
-        var existing = list.FirstOrDefault(s => s.Id == id);
-
-        // 删除旧 zip（如果换了文件名）
-        if (existing != null && existing.ZipFileName != zipFileName)
+        await _lock.WaitAsync();
+        try
         {
-            var oldPath = Path.Combine(_packagesDir, existing.ZipFileName);
-            if (File.Exists(oldPath))
-                File.Delete(oldPath);
+            // 保存 zip 文件
+            var zipFileName = $"{id}_{req.Version}.zip";
+            var zipPath = Path.Combine(_packagesDir, zipFileName);
+            await using var stream = new FileStream(zipPath, FileMode.Create);
+            await zipFile.CopyToAsync(stream);
+
+            // 更新清单
+            var list = GetAll();
+            var existing = list.FirstOrDefault(s => s.Id == id);
+
+            // 删除旧 zip（如果换了文件名）
+            if (existing != null && existing.ZipFileName != zipFileName)
+            {
+                var oldPath = Path.Combine(_packagesDir, existing.ZipFileName);
+                if (File.Exists(oldPath))
+                    File.Delete(oldPath);
+            }
+
+            var pkg = existing ?? new SoftwarePackage { Id = id };
+            pkg.Name = req.Name.Length > 0 ? req.Name : pkg.Name;
+            pkg.Version = req.Version;
+            // 如果描述不为空才更新
+            if (!string.IsNullOrWhiteSpace(req.Description))
+                pkg.Description = req.Description;
+            pkg.ExeName = req.ExeName;
+            pkg.ZipFileName = zipFileName;
+            pkg.FileSize = new FileInfo(zipPath).Length;
+            pkg.UpdatedAt = DateTime.Now;
+
+            if (existing == null)
+                list.Add(pkg);
+
+            SaveList(list);
+            _logger.LogInformation("发布软件 {Id} 版本 {Version}", id, req.Version);
+            return pkg;
         }
-
-        var pkg = existing ?? new SoftwarePackage { Id = id };
-        pkg.Name = req.Name.Length > 0 ? req.Name : pkg.Name;
-        pkg.Version = req.Version;
-        // 如果描述不为空才更新
-        if (!string.IsNullOrWhiteSpace(req.Description))
-            pkg.Description = req.Description;
-        pkg.ExeName = req.ExeName;
-        pkg.ZipFileName = zipFileName;
-        pkg.FileSize = new FileInfo(zipPath).Length;
-        pkg.UpdatedAt = DateTime.Now;
-
-        if (existing == null)
-            list.Add(pkg);
-
-        SaveList(list);
-        _logger.LogInformation("发布软件 {Id} 版本 {Version}", id, req.Version);
-        return pkg;
+        finally
+        {
+            _lock.Release();
+        }
     }
 
     // 删除软件

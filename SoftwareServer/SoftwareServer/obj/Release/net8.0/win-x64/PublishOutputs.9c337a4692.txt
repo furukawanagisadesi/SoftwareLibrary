@@ -1,6 +1,0 @@
-D:\CSharp\SoftwareLibrary-main\SoftwareServer\SoftwareServer\obj\Release\net8.0\win-x64\PubTmp\Out\appsettings.Development.json
-D:\CSharp\SoftwareLibrary-main\SoftwareServer\SoftwareServer\obj\Release\net8.0\win-x64\PubTmp\Out\appsettings.json
-D:\CSharp\SoftwareLibrary-main\SoftwareServer\SoftwareServer\obj\Release\net8.0\win-x64\PubTmp\Out\dotnet-tools.json
-D:\CSharp\SoftwareLibrary-main\SoftwareServer\SoftwareServer\obj\Release\net8.0\win-x64\PubTmp\Out\SoftwareServer.pdb
-D:\CSharp\SoftwareLibrary-main\SoftwareServer\SoftwareServer\obj\Release\net8.0\win-x64\PubTmp\Out\aspnetcorev2_inprocess.dll
-D:\CSharp\SoftwareLibrary-main\SoftwareServer\SoftwareServer\obj\Release\net8.0\win-x64\PubTmp\Out\SoftwareServer.exe

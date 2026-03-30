@@ -5,7 +5,10 @@ namespace Bootstrap
 {
     static class AppHelper
     {
-        public static readonly string InstallDir = @"D:\SoftwareManager";
+        public static string InstallDir = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "SoftwareLibrary"
+        );
         public static readonly string UpdaterPath = Path.Combine(InstallDir, "Updater.exe");
         public static readonly string ConfigPath = Path.Combine(InstallDir, "config.json");
         public static string ServerUrl = "http://127.0.0.1:15000";
@@ -15,7 +18,7 @@ namespace Bootstrap
             var paths = new[]
             {
                 Path.Combine(AppContext.BaseDirectory, "config.json"),
-                ConfigPath, // D:\SoftwareManager\config.json
+                ConfigPath, // D:\SoftwareLibrary\config.json
             };
 
             foreach (var jsonPath in paths)
