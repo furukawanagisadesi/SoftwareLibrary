@@ -22,7 +22,7 @@
   - 软件包上传和管理
   - 版本控制和分发
   - Swagger 文档支持
-- **默认端口**：192.168.16.52:15000
+- **默认端口**：127.0.0.1:15000
 
 ### 3. SoftwareManager 软件管理器
 - **功能**：用户界面客户端，用于浏览和管理软件
@@ -94,30 +94,16 @@ dotnet run
 ### 运行客户端
 
 ```bash
-# 运行启动器（推荐）
+# 首次安装必须启动Bootstrap
 cd Bootstrap
 dotnet run
 
-# 或直接运行软件管理器
+# 安装软件通过软件管理器
 cd SoftwareManager
 dotnet run
 ```
 
 ## ⚙️ 配置说明
-
-### 服务端配置 (appsettings.json)
-
-```json
-{
-  "Kestrel": {
-    "Endpoints": {
-      "Http": {
-        "Url": "http://127.0.0.1:15000"
-      }
-    }
-  }
-}
-```
 
 ### 客户端配置
 
@@ -155,6 +141,7 @@ dotnet publish -c Release -o ./publish
 修改 `appsettings.json`：
 ```json
 {
+  "AdminKey": "your-admin-key",
   "Kestrel": {
     "Endpoints": {
       "Http": {
@@ -176,7 +163,7 @@ dotnet publish -c Release -o ./publish
 ```json
 {
     "ServerUrl": "http://your-server-ip:port",
-    "installRoot": "your-path"
+    "InstallRoot": "your-path"
 }
 ```
 
@@ -184,6 +171,13 @@ dotnet publish -c Release -o ./publish
 ```bash
 cd publish
 dotnet SoftwareServer.dll
+```
+
+4. **上传软件包**
+```bash
+1. 将构建好的 Updater 与 SoftwareManager 打包为 .zip 文件
+2. 访问 http://your-server-ip:port/admin/index.html
+3. 上传打包好的 .zip 文件
 ```
 
 ### 客户端部署
