@@ -34,29 +34,32 @@
             // 
             // _bar
             // 
-            _bar.Location = new Point(16, 42);
+            _bar.Location = new Point(21, 49);
+            _bar.Margin = new Padding(4, 4, 4, 4);
             _bar.Name = "_bar";
-            _bar.Size = new Size(356, 12);
+            _bar.Size = new Size(458, 14);
             _bar.TabIndex = 0;
             // 
             // _lblMsg
             // 
             _lblMsg.AutoSize = true;
-            _lblMsg.Location = new Point(16, 14);
+            _lblMsg.Location = new Point(21, 16);
+            _lblMsg.Margin = new Padding(4, 0, 4, 0);
             _lblMsg.Name = "_lblMsg";
-            _lblMsg.Size = new Size(43, 17);
+            _lblMsg.Size = new Size(53, 20);
             _lblMsg.TabIndex = 1;
             _lblMsg.Text = "label1";
             // 
             // ProgressForm
             // 
-            AutoScaleDimensions = new SizeF(7F, 17F);
+            AutoScaleDimensions = new SizeF(9F, 20F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(384, 71);
+            ClientSize = new Size(494, 84);
             Controls.Add(_lblMsg);
             Controls.Add(_bar);
+            Margin = new Padding(4, 4, 4, 4);
             Name = "ProgressForm";
-            Text = "Form1";
+            Text = "Bootstrap";
             ResumeLayout(false);
             PerformLayout();
         }

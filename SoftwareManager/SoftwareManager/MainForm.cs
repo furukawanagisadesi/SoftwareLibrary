@@ -314,7 +314,7 @@ namespace SoftwareManager
                 form.ClientSize.Width - btnSave.Width - 16,
                 form.ClientSize.Height - btnSave.Height - 16
             );
-            btnSave.Click += (_, _) =>
+            btnSave.Click += async (_, _) =>
             {
                 _config.ServerUrl = txtUrl.Text.TrimEnd('/');
                 _config.InstallRoot = txtDir.Text;
@@ -322,6 +322,7 @@ namespace SoftwareManager
                 _service = new InstallService(_config);
                 form.Close();
                 SetStatus("设置已保存");
+                await RefreshListAsync();
             };
 
             form.Controls.AddRange([lblUrl, txtUrl, lblDir, txtDir, btnSave]);

@@ -26,25 +26,17 @@ namespace Bootstrap
                     continue;
                 try
                 {
-                    var text = File.ReadAllText(jsonPath);
-                    using var doc = JsonDocument.Parse(text);
-
-                    if (doc.RootElement.TryGetProperty("serverUrl", out var urlEl))
+                    var cfg = JsonSerializer.Deserialize<BootstrapConfig>(
+                        File.ReadAllText(jsonPath),
+                        new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
+                    );
+                    if (cfg != null)
                     {
-                        var val = urlEl.GetString();
-                        if (!string.IsNullOrWhiteSpace(val))
-                            ServerUrl = val.TrimEnd('/');
+                        ServerUrl = cfg.ServerUrl.TrimEnd('/');
+                        if (!string.IsNullOrWhiteSpace(cfg.InstallRoot))
+                            InstallRoot = cfg.InstallRoot;
+                        return;
                     }
-
-                    if (doc.RootElement.TryGetProperty("installRoot", out var rootEl))
-                    {
-                        var val = rootEl.GetString();
-                        // 不为空才覆盖，为空就保持默认的 D:\SoftwareLibrary\apps
-                        if (!string.IsNullOrWhiteSpace(val))
-                            InstallRoot = val;
-                    }
-
-                    return;
                 }
                 catch { }
             }
@@ -52,13 +44,7 @@ namespace Bootstrap
 
         public static void WriteConfig()
         {
-            if (File.Exists(ConfigPath))
-                return;
-            var config = new
-            {
-                serverUrl = ServerUrl,
-                installRoot = Path.Combine(InstallDir, "apps"),
-            };
+            var config = new { serverUrl = ServerUrl, installRoot = InstallRoot };
             File.WriteAllText(
                 ConfigPath,
                 JsonSerializer.Serialize(config, new JsonSerializerOptions { WriteIndented = true })
@@ -87,5 +73,11 @@ namespace Bootstrap
         {
             File.WriteAllText(Path.Combine(InstallDir, "updater-version.txt"), version);
         }
+    }
+
+    class BootstrapConfig
+    {
+        public string ServerUrl { get; set; } = "http://127.0.0.1:15000";
+        public string InstallRoot { get; set; } = @"D:\SoftwareLibrary\apps";
     }
 }
