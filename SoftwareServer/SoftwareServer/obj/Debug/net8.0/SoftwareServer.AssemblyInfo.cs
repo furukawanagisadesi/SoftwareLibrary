@@ -11,15 +11,13 @@
 using System;
 using System.Reflection;
 
-[assembly: System.Reflection.AssemblyCompanyAttribute("SoftwareManager")]
-[assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
+[assembly: System.Reflection.AssemblyCompanyAttribute("SoftwareServer")]
+[assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
 [assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+d58ad82707ed5ca4818812b9af595ede8133732c")]
-[assembly: System.Reflection.AssemblyProductAttribute("SoftwareManager")]
-[assembly: System.Reflection.AssemblyTitleAttribute("SoftwareManager")]
+[assembly: System.Reflection.AssemblyProductAttribute("SoftwareServer")]
+[assembly: System.Reflection.AssemblyTitleAttribute("SoftwareServer")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
-[assembly: System.Runtime.Versioning.TargetPlatformAttribute("Windows7.0")]
-[assembly: System.Runtime.Versioning.SupportedOSPlatformAttribute("Windows7.0")]
 
 // 由 MSBuild WriteCodeFragment 类生成。
 

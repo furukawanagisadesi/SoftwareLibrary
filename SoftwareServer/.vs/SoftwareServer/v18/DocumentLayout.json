@@ -1,7 +1,12 @@
 {
   "Version": 1,
-  "WorkspaceRootPath": "D:\\CSharp\\WorkProject\\SoftwareLibrary_WinForm\\SoftwareLibrary\\SoftwareServer\\",
-  "Documents": [],
+  "WorkspaceRootPath": "D:\\CSharp\\WorkProject\\SoftwareLibrary\\SoftwareServer\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{F20CE134-DCBD-A485-F75E-1D0E23D1B579}|SoftwareServer\\SoftwareServer.csproj|d:\\csharp\\workproject\\softwarelibrary\\softwareserver\\softwareserver\\wwwroot\\admin\\index.html||{40D31677-CBC0-4297-A9EF-89D907823A98}",
+      "RelativeMoniker": "D:0:0:{F20CE134-DCBD-A485-F75E-1D0E23D1B579}|SoftwareServer\\SoftwareServer.csproj|solutionrelative:softwareserver\\wwwroot\\admin\\index.html||{40D31677-CBC0-4297-A9EF-89D907823A98}"
+    }
+  ],
   "DocumentGroupContainers": [
     {
       "Orientation": 0,
@@ -9,11 +14,20 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": -1,
+          "SelectedChildIndex": 0,
           "Children": [
             {
-              "$type": "Bookmark",
-              "Name": "ST:0:0:{aa2115a1-9712-457b-9047-dbb71ca2cdd2}"
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "index.html",
+              "DocumentMoniker": "D:\\CSharp\\WorkProject\\SoftwareLibrary\\SoftwareServer\\SoftwareServer\\wwwroot\\admin\\index.html",
+              "RelativeDocumentMoniker": "SoftwareServer\\wwwroot\\admin\\index.html",
+              "ToolTip": "D:\\CSharp\\WorkProject\\SoftwareLibrary\\SoftwareServer\\SoftwareServer\\wwwroot\\admin\\index.html",
+              "RelativeToolTip": "SoftwareServer\\wwwroot\\admin\\index.html",
+              "ViewState": "AgIAALYCAAAAAAAAAAAuwA4DAAAHAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001512|",
+              "WhenOpened": "2026-04-08T01:29:48.722Z",
+              "EditorCaption": ""
             }
           ]
         }

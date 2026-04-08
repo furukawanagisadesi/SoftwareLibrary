@@ -78,13 +78,16 @@ public class InstallService
             var buffer = new byte[81920];
             long downloaded = 0;
             int read;
+            var sw = Stopwatch.StartNew();
             while ((read = await stream.ReadAsync(buffer)) > 0)
             {
                 await fs.WriteAsync(buffer.AsMemory(0, read));
                 downloaded += read;
-                if (total > 0)
+                // 限制回调频率，避免 UI 更新过快
+                if (total > 0 && sw.ElapsedMilliseconds >= 100)
                 {
-                    var pct = (int)(downloaded * 50 / total); // 下载占 0~50%
+                    sw.Restart();
+                    var pct = (int)((double)downloaded / total * 50); // 下载占 0~50%
                     progress.Report(
                         (pct, $"下载中 {FormatSize(downloaded)} / {FormatSize(total)}")
                     );
@@ -92,7 +95,7 @@ public class InstallService
             }
         }
 
-        // 2. 删除旧目录，解压
+        // 2. 删除旧目录，逐条目解压（支持进度上报）
         progress.Report((50, "解压中..."));
         if (Directory.Exists(installPath))
             Directory.Delete(installPath, true);
@@ -101,7 +104,38 @@ public class InstallService
         System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
         var gbk = System.Text.Encoding.GetEncoding("GBK");
 
-        ZipFile.ExtractToDirectory(tempZip, installPath, gbk);
+        using (var zip = ZipFile.Open(tempZip, ZipArchiveMode.Read, gbk))
+        {
+            var entries = zip.Entries.ToList();
+            int total2 = entries.Count;
+            for (int i = 0; i < total2; i++)
+            {
+                var entry = entries[i];
+                var destPath = Path.GetFullPath(Path.Combine(installPath, entry.FullName));
+                // 安全检查，防止路径穿越
+                if (
+                    !destPath.StartsWith(
+                        Path.GetFullPath(installPath) + Path.DirectorySeparatorChar
+                    )
+                    && destPath != Path.GetFullPath(installPath)
+                )
+                    continue;
+
+                if (entry.FullName.EndsWith('/') || entry.FullName.EndsWith('\\'))
+                {
+                    Directory.CreateDirectory(destPath);
+                }
+                else
+                {
+                    Directory.CreateDirectory(Path.GetDirectoryName(destPath)!);
+                    entry.ExtractToFile(destPath, overwrite: true);
+                }
+
+                // 解压占 50~80%
+                var pct = 50 + (int)((double)(i + 1) / total2 * 30);
+                progress.Report((pct, $"解压中 {i + 1} / {total2}"));
+            }
+        }
 
         File.Delete(tempZip);
 

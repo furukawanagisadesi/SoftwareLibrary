@@ -610,18 +610,18 @@
                 return;
             }
             tbody.innerHTML = list.map(pkg => `
-        <tr>
-          <td><code style="background:#f5f5f5;padding:2px 6px;border-radius:4px">${pkg.id}</code></td>
-          <td><strong>${pkg.name}</strong></td>
-          <td><span class="badge badge-blue">${pkg.version}</span></td>
-          <td style="color:#666;font-size:13px">${pkg.exeName}</td>
-          <td style="color:#666;font-size:13px">${formatSize(pkg.fileSize)}</td>
-          <td style="color:#666;font-size:13px">${formatDate(pkg.updatedAt)}</td>
-          <td>
-            <button class="btn btn-danger btn-sm" onclick="askDelete('${pkg.id}', '${pkg.name}')">删除</button>
-          </td>
-        </tr>
-      `).join('');
+            <tr>
+              <td><code style="background:#f5f5f5;padding:2px 6px;border-radius:4px">${pkg.id}</code></td>
+              <td><strong>${pkg.name}</strong></td>
+              <td><span class="badge badge-blue">${pkg.version}</span></td>
+              <td style="color:#666;font-size:13px">${pkg.exeName}</td>
+              <td style="color:#666;font-size:13px">${formatSize(pkg.fileSize)}</td>
+              <td style="color:#666;font-size:13px">${formatDate(pkg.updatedAt)}</td>
+              <td>
+                <button class="btn btn-danger btn-sm" onclick="askDelete('${pkg.id}', '${pkg.name}')">删除</button>
+              </td>
+            </tr>
+          `).join('');
         }
 
         // ── 发布 ─────────────────────────────────────────
@@ -637,11 +637,14 @@
             if (!exe) return showToast('请填写启动 EXE 文件名', 'error');
             if (!selectedFile) return showToast('请选择 ZIP 文件', 'error');
 
+            // 自动补 .exe 后缀
+            const exeName = exe.toLowerCase().endsWith('.exe') ? exe : exe + '.exe';
+
             const formData = new FormData();
             formData.append('zipFile', selectedFile);
             formData.append('version', version);
             formData.append('name', name || id);
-            formData.append('exeName', exe);
+            formData.append('exeName', exeName);
             formData.append('description', desc);
 
             setPublishStatus('上传中...');

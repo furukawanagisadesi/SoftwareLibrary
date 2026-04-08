@@ -11,6 +11,9 @@ namespace SoftwareManager
         private List<SoftwarePackage> _serverList = [];
         private List<InstalledRecord> _installedList = [];
 
+        private int _sortColumn = 3; // 默认按"状态"列排序
+        private bool _sortAscending = true;
+
         public MainForm()
         {
             InitializeComponent();
@@ -33,6 +36,17 @@ namespace SoftwareManager
             _btnReinstall.Click += async (_, _) => await DoInstallAsync(true);
             _btnUninstall.Click += (_, _) => DoUninstall();
             _listView.SelectedIndexChanged += (_, _) => UpdateButtons();
+            _listView.ColumnClick += (_, e) =>
+            {
+                if (_sortColumn == e.Column)
+                    _sortAscending = !_sortAscending;
+                else
+                {
+                    _sortColumn = e.Column;
+                    _sortAscending = true;
+                }
+                RenderList();
+            };
 
             // 按钮初始状态
             _btnInstall.Enabled = false;
@@ -66,25 +80,69 @@ namespace SoftwareManager
             }
         }
 
+        // 状态排序优先级：有更新=0, 未安装=1, 已最新=2
+        private static int StatusOrder(string status) =>
+            status switch
+            {
+                "有更新" => 0,
+                "未安装" => 1,
+                "已最新" => 2,
+                _ => 9,
+            };
+
         private void RenderList()
         {
-            _listView.Items.Clear();
-            foreach (var pkg in _serverList)
+            // 先构建带状态的数据
+            var rows = _serverList
+                .Select(pkg =>
+                {
+                    var installed = _installedList.FirstOrDefault(r => r.Id == pkg.Id);
+                    var installedVer = installed?.Version ?? "-";
+                    var isInstalled = installed != null;
+                    var needsUpdate = isInstalled && installed!.Version != pkg.Version;
+                    var statusText = isInstalled ? (needsUpdate ? "有更新" : "已最新") : "未安装";
+                    return (pkg, installedVer, statusText);
+                })
+                .ToList();
+
+            // 排序
+            rows = _sortColumn switch
             {
-                var installed = _installedList.FirstOrDefault(r => r.Id == pkg.Id);
-                var installedVer = installed?.Version ?? "-";
-                var isInstalled = installed != null;
-                var needsUpdate = isInstalled && installed!.Version != pkg.Version;
+                0 => _sortAscending
+                    ? rows.OrderBy(r => r.pkg.Name).ToList()
+                    : rows.OrderByDescending(r => r.pkg.Name).ToList(),
+                1 => _sortAscending
+                    ? rows.OrderBy(r => r.installedVer).ToList()
+                    : rows.OrderByDescending(r => r.installedVer).ToList(),
+                2 => _sortAscending
+                    ? rows.OrderBy(r => r.pkg.Version).ToList()
+                    : rows.OrderByDescending(r => r.pkg.Version).ToList(),
+                3 => _sortAscending
+                    ? rows.OrderBy(r => StatusOrder(r.statusText)).ToList()
+                    : rows.OrderByDescending(r => StatusOrder(r.statusText)).ToList(),
+                4 => _sortAscending
+                    ? rows.OrderBy(r => r.pkg.Description).ToList()
+                    : rows.OrderByDescending(r => r.pkg.Description).ToList(),
+                _ => rows,
+            };
 
-                string statusText = isInstalled ? (needsUpdate ? "有更新" : "已最新") : "未安装";
+            // 更新列标题，显示排序方向箭头
+            for (int i = 0; i < _listView.Columns.Count; i++)
+            {
+                var col = _listView.Columns[i];
+                var baseName = col.Text.TrimEnd(' ', '▲', '▼');
+                col.Text = i == _sortColumn ? baseName + (_sortAscending ? " ▲" : " ▼") : baseName;
+            }
 
+            _listView.Items.Clear();
+            foreach (var (pkg, installedVer, statusText) in rows)
+            {
                 var item = new ListViewItem(pkg.Name);
                 item.SubItems.Add(installedVer);
                 item.SubItems.Add(pkg.Version);
                 item.SubItems.Add(statusText);
                 item.SubItems.Add(pkg.Description);
                 item.Tag = pkg;
-
                 _listView.Items.Add(item);
             }
             UpdateButtons();
