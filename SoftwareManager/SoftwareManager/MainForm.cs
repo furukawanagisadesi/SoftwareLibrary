@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.IO.Compression;
 using SoftwareManager.Models;
 using SoftwareManager.Services;
 
@@ -101,10 +102,32 @@ namespace SoftwareManager
                 .Select(pkg =>
                 {
                     var installed = _installedList.FirstOrDefault(r => r.Id == pkg.Id);
-                    var installedVer = installed?.Version ?? "-";
-                    var isInstalled = installed != null;
-                    var needsUpdate = isInstalled && installed!.Version != pkg.Version;
-                    var statusText = isInstalled ? (needsUpdate ? "有更新" : "已最新") : "未安装";
+
+                    // Bootstrap 特殊处理
+                    var isBootstrap = pkg.Id.Equals(
+                        "bootstrap",
+                        StringComparison.OrdinalIgnoreCase
+                    );
+                    var bootstrapExists = isBootstrap && File.Exists(_config.BootstrapPath);
+
+                    var installedVer = isBootstrap
+                        ? (bootstrapExists ? pkg.Version : "-")
+                        : (installed?.Version ?? "-");
+
+                    var isInstalled = isBootstrap ? bootstrapExists : installed != null;
+
+                    var needsUpdate =
+                        isInstalled
+                        && (
+                            isBootstrap
+                                ? false // Bootstrap 不检查版本对比
+                                : installed!.Version != pkg.Version
+                        );
+
+                    var statusText = isBootstrap
+                        ? "已最新"
+                        : (isInstalled ? (needsUpdate ? "有更新" : "已最新") : "未安装");
+
                     return (pkg, installedVer, statusText);
                 })
                 .ToList();
@@ -170,6 +193,14 @@ namespace SoftwareManager
                 return;
             }
 
+            if (pkg.Id.Equals("bootstrap", StringComparison.OrdinalIgnoreCase))
+            {
+                _btnInstall.Enabled = false; // 禁止安装
+                _btnUninstall.Enabled = false; // 禁止卸载
+                _btnReinstall.Enabled = true; // 只允许重装
+                return;
+            }
+
             var installed = _installedList.FirstOrDefault(r => r.Id == pkg.Id);
             var isSystemComponent = InstallService.SystemIds.Contains(pkg.Id);
             _btnInstall.Enabled = installed == null;
@@ -184,6 +215,12 @@ namespace SoftwareManager
                 return;
 
             var action = isReinstall ? "重新安装" : "安装"; // ← 先声明 action
+
+            if (pkg.Id.Equals("bootstrap", StringComparison.OrdinalIgnoreCase))
+            {
+                await DoBootstrapReinstall(pkg);
+                return;
+            }
 
             // softwaremanager/updater 重装
             if (
@@ -481,16 +518,15 @@ namespace SoftwareManager
             // BAT 放到 Temp 目录，并先 cd 到根目录
             var batPath = Path.Combine(Path.GetTempPath(), $"update_{packageId}.bat");
 
+            // 使用 handle.exe 解锁，更可靠
             var batContent =
                 $@"
 @echo off
-cd /d C:\
-timeout /t 2 /nobreak >nul
-taskkill /F /IM SoftwareManager.exe >nul 2>&1
-taskkill /F /IM Updater.exe >nul 2>&1
+cd /d {Path.GetTempPath()}
+""{Path.Combine(_config.InstallDir, "handle.exe")}"" -accepteula ""{targetDir}"" -c -y >nul 2>&1
 timeout /t 1 /nobreak >nul
 rd /S /Q ""{targetDir}"" >nul 2>&1
-start """" ""{bootstrapPath}""
+start """" ""{_config.BootstrapPath}""
 del ""%~f0"" >nul 2>&1
 ";
 
@@ -510,6 +546,163 @@ del ""%~f0"" >nul 2>&1
             );
 
             Application.Exit();
+        }
+
+        // Bootstrap 重装（精简版）
+        private async Task DoBootstrapReinstall(SoftwarePackage pkg)
+        {
+            var result = MessageBox.Show(
+                $"确定要重新安装 Bootstrap 吗？\n版本：{pkg.Version}",
+                "重新安装 Bootstrap",
+                MessageBoxButtons.OKCancel,
+                MessageBoxIcon.Information
+            );
+            if (result != DialogResult.OK)
+                return;
+
+            SetBusy(true);
+            _progressBar.Value = 0;
+
+            try
+            {
+                var tempDir = Path.Combine(Path.GetTempPath(), $"bootstrap_{Guid.NewGuid()}");
+                Directory.CreateDirectory(tempDir);
+
+                // 下载
+                _lblProgress.Text = "下载中...";
+                using var http = new HttpClient { BaseAddress = new Uri(_config.ServerUrl) };
+                var zipPath = Path.Combine(tempDir, "bootstrap.zip");
+                var response = await http.GetAsync($"/api/software/{pkg.Id}/download");
+                await using (var fs = new FileStream(zipPath, FileMode.Create))
+                {
+                    await response.Content.CopyToAsync(fs);
+                }
+
+                // 解压
+                _progressBar.Value = 50;
+                _lblProgress.Text = "解压中...";
+                System.Text.Encoding.RegisterProvider(
+                    System.Text.CodePagesEncodingProvider.Instance
+                );
+                ZipFile.ExtractToDirectory(
+                    zipPath,
+                    tempDir,
+                    System.Text.Encoding.GetEncoding("GBK")
+                );
+                File.Delete(zipPath);
+
+                // 安装
+                _progressBar.Value = 70;
+                _lblProgress.Text = "安装中...";
+                await Task.Run(() => InstallBootstrap(tempDir));
+
+                _progressBar.Value = 100;
+                MessageBox.Show(
+                    "Bootstrap 重新安装完成！",
+                    "完成",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information
+                );
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    $"失败：{ex.Message}",
+                    "错误",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error
+                );
+            }
+            finally
+            {
+                SetBusy(false);
+                _progressBar.Value = 0;
+                _lblProgress.Text = "";
+
+                _btnInstall.Enabled = false;
+                _btnReinstall.Enabled = true;
+                _btnUninstall.Enabled = false;
+            }
+        }
+
+        // 安装 Bootstrap 文件
+        private void InstallBootstrap(string sourceDir)
+        {
+            var targetDir = _config.InstallDir;
+            var handlePath = Path.Combine(targetDir, "handle.exe");
+            var exclude = new[]
+            {
+                "config.json",
+                "installed.json",
+                "launch.log",
+                "error.log",
+                "handle.exe",
+            };
+
+            // 解锁
+            if (File.Exists(handlePath))
+            {
+                foreach (var file in Directory.GetFiles(targetDir))
+                {
+                    if (exclude.Contains(Path.GetFileName(file)))
+                        continue;
+                    TryUnlock(handlePath, file);
+                }
+            }
+
+            // 获取源文件（排除 apps 目录）
+            var sourceFiles = Directory
+                .GetFiles(sourceDir)
+                .Where(f => !exclude.Contains(Path.GetFileName(f)))
+                .ToList();
+
+            // 删除旧文件
+            foreach (var file in Directory.GetFiles(targetDir))
+            {
+                var name = Path.GetFileName(file);
+                if (exclude.Contains(name))
+                    continue;
+                if (sourceFiles.Any(s => Path.GetFileName(s) == name))
+                    continue;
+                TryDelete(file);
+            }
+
+            // 复制新文件
+            foreach (var file in sourceFiles)
+            {
+                File.Copy(file, Path.Combine(targetDir, Path.GetFileName(file)), overwrite: true);
+            }
+
+            Directory.Delete(sourceDir, true);
+        }
+
+        private void TryUnlock(string handlePath, string filePath)
+        {
+            try
+            {
+                Process
+                    .Start(
+                        new ProcessStartInfo
+                        {
+                            FileName = handlePath,
+                            Arguments = $"-accepteula \"{filePath}\" -c -y",
+                            WindowStyle = ProcessWindowStyle.Hidden,
+                            CreateNoWindow = true,
+                            UseShellExecute = false,
+                        }
+                    )
+                    ?.WaitForExit(2000);
+            }
+            catch { }
+        }
+
+        private void TryDelete(string filePath)
+        {
+            try
+            {
+                File.Delete(filePath);
+            }
+            catch { }
         }
     }
 }

@@ -43,9 +43,6 @@ namespace Updater
                 return;
             }
 
-            // 先检查并更新 Bootstrap 自身（此时 Bootstrap 已退出，可以安全覆盖）
-            await EnsureBootstrapAsync();
-
             SoftwareInfo? serverInfo = null;
             try
             {
@@ -198,83 +195,6 @@ namespace Updater
                         Application.Exit();
                     }
                 }
-            }
-        }
-
-        // 检查并更新 Bootstrap，Bootstrap 此时已退出可安全覆盖
-        async Task EnsureBootstrapAsync()
-        {
-            try
-            {
-                using var http = new HttpClient { BaseAddress = new Uri(AppHelper.ServerUrl) };
-                http.Timeout = TimeSpan.FromSeconds(10);
-                var json = await http.GetStringAsync("/api/software/bootstrap/info");
-                var serverInfo = JsonSerializer.Deserialize<SoftwareInfo>(
-                    json,
-                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
-                );
-                if (serverInfo == null)
-                    return;
-
-                var localVersion = AppHelper.GetLocalVersion("bootstrap");
-                if (localVersion == serverInfo.Version && File.Exists(AppHelper.BootstrapPath))
-                    return;
-
-                // 下载新版 Bootstrap 到临时文件，再覆盖
-                var tempZip = Path.Combine(
-                    Path.GetTempPath(),
-                    $"bootstrap_{serverInfo.Version}.zip"
-                );
-                var tempDir = Path.Combine(Path.GetTempPath(), $"bootstrap_{serverInfo.Version}");
-
-                using (
-                    var response = await http.GetAsync(
-                        "/api/software/bootstrap/download",
-                        HttpCompletionOption.ResponseHeadersRead
-                    )
-                )
-                {
-                    response.EnsureSuccessStatusCode();
-                    await using var fs = new FileStream(tempZip, FileMode.Create);
-                    await using var stream = await response.Content.ReadAsStreamAsync();
-                    var buffer = new byte[81920];
-                    int read;
-                    while ((read = await stream.ReadAsync(buffer)) > 0)
-                        await fs.WriteAsync(buffer.AsMemory(0, read));
-                }
-
-                System.Text.Encoding.RegisterProvider(
-                    System.Text.CodePagesEncodingProvider.Instance
-                );
-                var gbk = System.Text.Encoding.GetEncoding("GBK");
-                if (Directory.Exists(tempDir))
-                    Directory.Delete(tempDir, true);
-                ZipFile.ExtractToDirectory(tempZip, tempDir, gbk);
-                File.Delete(tempZip);
-
-                // 覆盖 InstallDir 根目录下的 Bootstrap.exe
-                foreach (var file in Directory.GetFiles(tempDir, "*", SearchOption.AllDirectories))
-                {
-                    var relativePath = Path.GetRelativePath(tempDir, file);
-                    var destPath = Path.Combine(AppHelper.InstallDir, relativePath);
-                    Directory.CreateDirectory(Path.GetDirectoryName(destPath)!);
-                    File.Copy(file, destPath, overwrite: true);
-                }
-                Directory.Delete(tempDir, true);
-
-                AppHelper.SaveInstalledRecord(
-                    new InstalledRecord
-                    {
-                        Id = "bootstrap",
-                        Version = serverInfo.Version,
-                        InstallPath = AppHelper.InstallDir,
-                        InstalledAt = DateTime.Now,
-                    }
-                );
-            }
-            catch
-            {
-                // Bootstrap 更新失败不阻断主流程，静默忽略
             }
         }
 
