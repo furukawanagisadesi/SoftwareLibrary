@@ -27,18 +27,22 @@ namespace Updater
 
         async Task CheckUpdateAndLaunch(string appId)
         {
-            Directory.CreateDirectory(AppHelper.UpdaterDir);
-            File.WriteAllText(Path.Combine(AppHelper.UpdaterDir, "error.log"), "");
+            Directory.CreateDirectory(AppHelper.InstallDir);
+            File.WriteAllText(Path.Combine(AppHelper.InstallDir, "error.log"), "");
 
             var installPath = Path.Combine(AppHelper.InstallRoot, appId);
-            var versionFile = Path.Combine(installPath, "version.txt");
-            var localVersion = File.Exists(versionFile) ? File.ReadAllText(versionFile).Trim() : "";
+
+            // 版本统一从 installed.json 读取，不再用 version.txt
+            var localVersion = AppHelper.GetLocalVersion(appId);
 
             if (_offline)
             {
                 await LaunchApp(installPath, "", appId);
                 return;
             }
+
+            // 先检查并更新 Bootstrap 自身（此时 Bootstrap 已退出，可以安全覆盖）
+            await EnsureBootstrapAsync();
 
             SoftwareInfo? serverInfo = null;
             try
@@ -53,6 +57,7 @@ namespace Updater
             }
             catch
             {
+                // 服务器不可达，用本地已有版本直接启动
                 await LaunchApp(installPath, localVersion, appId);
                 return;
             }
@@ -81,12 +86,17 @@ namespace Updater
             try
             {
                 await DownloadAndExtract(appId, serverInfo, installPath, form);
-                File.WriteAllText(versionFile, serverInfo.Version);
-                UpdateInstalledRecord(appId, serverInfo.Version, installPath);
+                AppHelper.SaveInstalledRecord(new InstalledRecord
+                {
+                    Id = appId,
+                    Version = serverInfo.Version,
+                    InstallPath = installPath,
+                    InstalledAt = DateTime.Now,
+                });
                 form.Close();
 
                 if (appId == "softwaremanager")
-                    CreateSoftwareManagerShortcut(installPath, serverInfo.ExeName);
+                    CreateShortcut("软件管理器", installPath, serverInfo.ExeName, "--app=softwaremanager");
 
                 await LaunchApp(installPath, serverInfo.ExeName, appId);
             }
@@ -98,6 +108,7 @@ namespace Updater
                 {
                     if (appId == "softwaremanager")
                     {
+                        // SoftwareManager 正在运行，直接前置窗口
                         var proc = Process.GetProcessesByName("SoftwareManager").FirstOrDefault();
                         if (proc != null)
                         {
@@ -112,7 +123,7 @@ namespace Updater
                 }
 
                 File.WriteAllText(
-                    Path.Combine(AppHelper.UpdaterDir, "error.log"),
+                    Path.Combine(AppHelper.InstallDir, "error.log"),
                     $"Time: {DateTime.Now}\nAppId: {appId}\nError: {ex.Message}\nStackTrace: {ex.StackTrace}"
                 );
 
@@ -128,7 +139,7 @@ namespace Updater
                     return;
                 }
 
-                if (Directory.Exists(installPath) && Directory.GetFiles(installPath).Length > 0)
+                if (Directory.GetFiles(installPath).Length > 0)
                 {
                     var result = MessageBox.Show(
                         $"更新失败：{ex.Message}\n\n是否用旧版本启动？\n\n点击「取消」可重新安装。",
@@ -143,35 +154,19 @@ namespace Updater
                     }
                     else if (result == DialogResult.Cancel)
                     {
-                        if (Directory.Exists(installPath))
-                        {
-                            foreach (
-                                var file in Directory.GetFiles(
-                                    installPath,
-                                    "*",
-                                    SearchOption.AllDirectories
-                                )
-                            )
-                            {
-                                File.SetAttributes(file, FileAttributes.Normal);
-                                File.Delete(file);
-                            }
-                            foreach (
-                                var dir in Directory
-                                    .GetDirectories(installPath, "*", SearchOption.AllDirectories)
-                                    .OrderByDescending(d => d.Length)
-                            )
-                                Directory.Delete(dir, false);
-                            Directory.Delete(installPath, false);
-                        }
-
+                        CleanDirectory(installPath);
                         var form2 = new UpdateForm(serverInfo.Name, serverInfo.Version);
                         form2.Show();
                         try
                         {
                             await DownloadAndExtract(appId, serverInfo, installPath, form2);
-                            File.WriteAllText(versionFile, serverInfo.Version);
-                            UpdateInstalledRecord(appId, serverInfo.Version, installPath);
+                            AppHelper.SaveInstalledRecord(new InstalledRecord
+                            {
+                                Id = appId,
+                                Version = serverInfo.Version,
+                                InstallPath = installPath,
+                                InstalledAt = DateTime.Now,
+                            });
                             form2.Close();
                             await LaunchApp(installPath, serverInfo.ExeName, appId);
                         }
@@ -195,6 +190,74 @@ namespace Updater
             }
         }
 
+        // 检查并更新 Bootstrap，Bootstrap 此时已退出可安全覆盖
+        async Task EnsureBootstrapAsync()
+        {
+            try
+            {
+                using var http = new HttpClient { BaseAddress = new Uri(AppHelper.ServerUrl) };
+                http.Timeout = TimeSpan.FromSeconds(10);
+                var json = await http.GetStringAsync("/api/software/bootstrap/info");
+                var serverInfo = JsonSerializer.Deserialize<SoftwareInfo>(
+                    json,
+                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
+                );
+                if (serverInfo == null)
+                    return;
+
+                var localVersion = AppHelper.GetLocalVersion("bootstrap");
+                if (localVersion == serverInfo.Version && File.Exists(AppHelper.BootstrapPath))
+                    return;
+
+                // 下载新版 Bootstrap 到临时文件，再覆盖
+                var tempZip = Path.Combine(Path.GetTempPath(), $"bootstrap_{serverInfo.Version}.zip");
+                var tempDir = Path.Combine(Path.GetTempPath(), $"bootstrap_{serverInfo.Version}");
+
+                using (var response = await http.GetAsync(
+                    "/api/software/bootstrap/download",
+                    HttpCompletionOption.ResponseHeadersRead
+                ))
+                {
+                    response.EnsureSuccessStatusCode();
+                    await using var fs = new FileStream(tempZip, FileMode.Create);
+                    await using var stream = await response.Content.ReadAsStreamAsync();
+                    var buffer = new byte[81920];
+                    int read;
+                    while ((read = await stream.ReadAsync(buffer)) > 0)
+                        await fs.WriteAsync(buffer.AsMemory(0, read));
+                }
+
+                System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
+                var gbk = System.Text.Encoding.GetEncoding("GBK");
+                if (Directory.Exists(tempDir))
+                    Directory.Delete(tempDir, true);
+                ZipFile.ExtractToDirectory(tempZip, tempDir, gbk);
+                File.Delete(tempZip);
+
+                // 覆盖 InstallDir 根目录下的 Bootstrap.exe
+                foreach (var file in Directory.GetFiles(tempDir, "*", SearchOption.AllDirectories))
+                {
+                    var relativePath = Path.GetRelativePath(tempDir, file);
+                    var destPath = Path.Combine(AppHelper.InstallDir, relativePath);
+                    Directory.CreateDirectory(Path.GetDirectoryName(destPath)!);
+                    File.Copy(file, destPath, overwrite: true);
+                }
+                Directory.Delete(tempDir, true);
+
+                AppHelper.SaveInstalledRecord(new InstalledRecord
+                {
+                    Id = "bootstrap",
+                    Version = serverInfo.Version,
+                    InstallPath = AppHelper.InstallDir,
+                    InstalledAt = DateTime.Now,
+                });
+            }
+            catch
+            {
+                // Bootstrap 更新失败不阻断主流程，静默忽略
+            }
+        }
+
         async Task DownloadAndExtract(
             string appId,
             SoftwareInfo info,
@@ -205,8 +268,8 @@ namespace Updater
             using var http = new HttpClient { BaseAddress = new Uri(AppHelper.ServerUrl) };
             http.Timeout = TimeSpan.FromMinutes(30);
 
-            var tempZip = Path.Combine(AppHelper.UpdaterDir, $"{appId}_{info.Version}.zip");
-            var tempDir = Path.Combine(AppHelper.UpdaterDir, $"temp_{appId}");
+            var tempZip = Path.Combine(AppHelper.InstallDir, $"{appId}_{info.Version}.zip");
+            var tempDir = Path.Combine(AppHelper.InstallDir, $"temp_{appId}");
 
             using (
                 var response = await http.GetAsync(
@@ -247,7 +310,6 @@ namespace Updater
             System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
             var gbk = System.Text.Encoding.GetEncoding("GBK");
             ZipFile.ExtractToDirectory(tempZip, tempDir, gbk);
-
             File.Delete(tempZip);
 
             form.SetProgress(92, "安装中...");
@@ -314,11 +376,7 @@ namespace Updater
 
             if (string.IsNullOrEmpty(exeName))
             {
-                var exeFiles = Directory.GetFiles(
-                    installPath,
-                    "*.exe",
-                    SearchOption.TopDirectoryOnly
-                );
+                var exeFiles = Directory.GetFiles(installPath, "*.exe", SearchOption.TopDirectoryOnly);
                 if (exeFiles.Length == 0)
                 {
                     MessageBox.Show(
@@ -347,51 +405,48 @@ namespace Updater
             }
 
             File.WriteAllText(
-                Path.Combine(AppHelper.UpdaterDir, "launch.log"),
+                Path.Combine(AppHelper.InstallDir, "launch.log"),
                 $"installPath: {installPath}\nexeName: {exeName}\nexePath: {exePath}\nTime: {DateTime.Now}"
             );
 
-            // 显示启动画面
             var splash = new UpdateForm(Path.GetFileNameWithoutExtension(exeName));
             splash.Show();
             splash.SetProgress(50, "正在启动...");
 
-            Process.Start(
-                new ProcessStartInfo(exePath)
-                {
-                    UseShellExecute = true,
-                    WorkingDirectory = installPath,
-                }
-            );
+            Process.Start(new ProcessStartInfo(exePath)
+            {
+                UseShellExecute = true,
+                WorkingDirectory = AppHelper.InstallDir,
+            });
 
             splash.SetProgress(100, "启动完成");
-            await Task.Delay(800); // ← 不阻塞UI线程
+            await Task.Delay(800);
             splash.Close();
 
             Application.Exit();
         }
 
-        void CreateSoftwareManagerShortcut(string installPath, string exeName)
+        // 统一的快捷方式创建方法，SoftwareManager 和其他软件共用
+        void CreateShortcut(string name, string installPath, string exeName, string bootstrapArgs)
         {
-            var bootstrapPath = Path.Combine(AppHelper.UpdaterDir, "Bootstrap.exe");
             var shortcutPath = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
-                "软件管理器.lnk"
+                $"{name}.lnk"
             );
             var exePath = Path.Combine(installPath, exeName);
 
             var script = $"""
 $ws = New-Object -ComObject WScript.Shell
 $s  = $ws.CreateShortcut('{shortcutPath}')
-$s.TargetPath       = '{bootstrapPath}'
-$s.Arguments        = '--app=softwaremanager'
-$s.WorkingDirectory = '{installPath}'
-$s.Description      = '软件管理器'
+$s.TargetPath       = '{AppHelper.BootstrapPath}'
+$s.Arguments        = '{bootstrapArgs}'
+$s.WorkingDirectory = '{AppHelper.InstallDir}'
+$s.Description      = '{name}'
 $s.IconLocation     = '{exePath},0'
 $s.Save()
 """;
 
-            var scriptPath = Path.Combine(Path.GetTempPath(), "create_shortcut.ps1");
+            var scriptPath = Path.Combine(Path.GetTempPath(), $"shortcut_{name}.ps1");
             File.WriteAllText(scriptPath, script, System.Text.Encoding.UTF8);
 
             var psi = new ProcessStartInfo(
@@ -411,49 +466,23 @@ $s.Save()
 
             if (!string.IsNullOrEmpty(error))
                 File.AppendAllText(
-                    Path.Combine(AppHelper.UpdaterDir, "error.log"),
+                    Path.Combine(AppHelper.InstallDir, "error.log"),
                     $"Time: {DateTime.Now}\n创建快捷方式错误：{error}"
                 );
         }
 
-        void UpdateInstalledRecord(string appId, string version, string installPath)
+        static void CleanDirectory(string path)
         {
-            try
+            foreach (var file in Directory.GetFiles(path, "*", SearchOption.AllDirectories))
             {
-                var recordFile = Path.Combine(AppHelper.UpdaterDir, "installed.json");
-                var records = new List<InstalledRecord>();
-
-                if (File.Exists(recordFile))
-                {
-                    var json = File.ReadAllText(recordFile);
-                    records =
-                        JsonSerializer.Deserialize<List<InstalledRecord>>(
-                            json,
-                            new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
-                        ) ?? [];
-                }
-
-                records.RemoveAll(r => string.IsNullOrEmpty(r.Id));
-                records.RemoveAll(r => r.Id == appId);
-                records.Add(
-                    new InstalledRecord
-                    {
-                        Id = appId,
-                        Version = version,
-                        InstallPath = installPath,
-                        InstalledAt = DateTime.Now,
-                    }
-                );
-
-                File.WriteAllText(
-                    recordFile,
-                    JsonSerializer.Serialize(
-                        records,
-                        new JsonSerializerOptions { WriteIndented = true }
-                    )
-                );
+                File.SetAttributes(file, FileAttributes.Normal);
+                File.Delete(file);
             }
-            catch { }
+            foreach (var dir in Directory
+                .GetDirectories(path, "*", SearchOption.AllDirectories)
+                .OrderByDescending(d => d.Length))
+                Directory.Delete(dir, false);
+            Directory.Delete(path, false);
         }
     }
 }

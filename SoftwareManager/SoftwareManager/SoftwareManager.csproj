@@ -1,5 +1,4 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0-windows</TargetFramework>
@@ -12,11 +11,4 @@
     <Folder Include="Models\" />
     <Folder Include="Services\" />
   </ItemGroup>
-
-  <ItemGroup>
-    <None Update="config.json">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
-  </ItemGroup>
-
 </Project>

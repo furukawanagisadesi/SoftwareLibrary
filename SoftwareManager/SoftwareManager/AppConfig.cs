@@ -1,38 +1,61 @@
 ﻿using System.Text.Json;
-
-namespace SoftwareManager;
+using System.Text.Json.Serialization;
 
 public class AppConfig
 {
-    private static readonly string ConfigPath = Path.Combine(
-        AppContext.BaseDirectory,
-        "config.json"
-    );
-
     public string ServerUrl { get; set; } = "http://127.0.0.1:15000";
     public string InstallRoot { get; set; } = @"D:\SoftwareLibrary\apps";
-    public string BootstrapDir { get; set; } = @"D:\SoftwareLibrary";
+    public bool FirstInitialized { get; set; } = false;
+
+    // 基于 InstallRoot 计算，不存 JSON
+    [JsonIgnore] // ← 防止序列化这些派生属性
+    public string InstallDir => Path.GetDirectoryName(InstallRoot)!;
+
+    [JsonIgnore]
+    public string BootstrapPath => Path.Combine(InstallDir!, "Bootstrap.exe");
+
+    [JsonIgnore]
+    public string InstalledRecordPath => Path.Combine(InstallDir!, "installed.json");
+
+    // config.json 固定在 InstallDir 下
+    [JsonIgnore]
+    private string ConfigPath => Path.Combine(InstallDir!, "config.json");
 
     public static AppConfig Load()
     {
-        if (!File.Exists(ConfigPath))
+        // 先用默认值创建实例，计算配置路径
+        var defaultInstance = new AppConfig();
+        var configPath = defaultInstance.ConfigPath;
+
+        if (!File.Exists(configPath))
+            return defaultInstance;
+
+        try
         {
-            var def = new AppConfig();
-            def.Save();
-            return def;
-        }
-        var json = File.ReadAllText(ConfigPath);
-        return JsonSerializer.Deserialize<AppConfig>(
+            var json = File.ReadAllText(configPath);
+            var loaded = JsonSerializer.Deserialize<AppConfig>(
                 json,
                 new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
-            ) ?? new AppConfig();
+            );
+
+            return loaded ?? defaultInstance;
+        }
+        catch
+        {
+            return defaultInstance;
+        }
     }
 
     public void Save()
     {
+        // 只序列化三个核心字段
         var json = JsonSerializer.Serialize(
             this,
-            new JsonSerializerOptions { WriteIndented = true }
+            new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                // 忽略只读属性和标记 [JsonIgnore] 的属性
+            }
         );
         File.WriteAllText(ConfigPath, json);
     }

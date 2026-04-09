@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using SoftwareManager.Models;
 using SoftwareManager.Services;
 
@@ -13,6 +14,9 @@ namespace SoftwareManager
 
         private int _sortColumn = 3; // 默认按"状态"列排序
         private bool _sortAscending = true;
+
+        // 添加状态标记
+        private bool _isBusy = false;
 
         public MainForm()
         {
@@ -150,6 +154,15 @@ namespace SoftwareManager
 
         private void UpdateButtons()
         {
+            // 如果正在忙，不更新按钮状态（保持禁用）
+            if (_isBusy)
+            {
+                _btnInstall.Enabled = false;
+                _btnReinstall.Enabled = false;
+                _btnUninstall.Enabled = false;
+                return;
+            }
+
             var pkg = SelectedPackage();
             if (pkg == null)
             {
@@ -158,9 +171,10 @@ namespace SoftwareManager
             }
 
             var installed = _installedList.FirstOrDefault(r => r.Id == pkg.Id);
+            var isSystemComponent = InstallService.SystemIds.Contains(pkg.Id);
             _btnInstall.Enabled = installed == null;
             _btnReinstall.Enabled = installed != null;
-            _btnUninstall.Enabled = installed != null;
+            _btnUninstall.Enabled = installed != null && !isSystemComponent;
         }
 
         private async Task DoInstallAsync(bool isReinstall)
@@ -169,7 +183,37 @@ namespace SoftwareManager
             if (pkg == null)
                 return;
 
-            var action = isReinstall ? "重新安装" : "安装";
+            var action = isReinstall ? "重新安装" : "安装"; // ← 先声明 action
+
+            // softwaremanager/updater 重装
+            if (
+                pkg.Id.Equals("softwaremanager", StringComparison.OrdinalIgnoreCase)
+                || pkg.Id.Equals("updater", StringComparison.OrdinalIgnoreCase)
+            )
+            {
+                DoSelfUpdate(pkg.Id);
+                return;
+            }
+
+            // 检查软件是否在运行
+            if (IsSoftwareRunning(pkg))
+            {
+                var result = MessageBox.Show(
+                    $"「{pkg.Name}」正在运行，是否关闭并继续{action}？", // ← 后使用
+                    "确认关闭",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Question
+                );
+
+                if (result != DialogResult.Yes)
+                    return;
+
+                if (!TryCloseSoftware(pkg))
+                {
+                    MessageBox.Show("无法关闭正在运行的软件，请手动关闭后重试。", "提示");
+                    return;
+                }
+            }
             if (
                 MessageBox.Show(
                     $"确定要{action}「{pkg.Name}」吗？",
@@ -318,6 +362,8 @@ namespace SoftwareManager
             {
                 _config.ServerUrl = txtUrl.Text.TrimEnd('/');
                 _config.InstallRoot = txtDir.Text;
+                // FirstInitialized 由 Bootstrap 写入，这里不允许清除
+                _config.FirstInitialized = true;
                 _config.Save();
                 _service = new InstallService(_config);
                 form.Close();
@@ -338,7 +384,10 @@ namespace SoftwareManager
 
         private void SetBusy(bool busy)
         {
-            _btnInstall.Enabled = _btnReinstall.Enabled = _btnUninstall.Enabled = !busy;
+            _isBusy = busy;
+            _btnInstall.Enabled = !busy;
+            _btnReinstall.Enabled = !busy;
+            _btnUninstall.Enabled = !busy; // _busy 时全部禁用
             _btnRefresh.Enabled = !busy;
             UseWaitCursor = busy;
         }
@@ -367,6 +416,100 @@ namespace SoftwareManager
                 toolbar.Width - btnSettings.Width - _btnRefresh.Width - 24,
                 9
             );
+        }
+
+        // 检查软件是否在运行
+        private bool IsSoftwareRunning(SoftwarePackage pkg)
+        {
+            if (string.IsNullOrEmpty(pkg.ExeName))
+                return false;
+
+            var processName = Path.GetFileNameWithoutExtension(pkg.ExeName);
+            return Process.GetProcessesByName(processName).Length > 0;
+        }
+
+        // 尝试关闭软件
+        private bool TryCloseSoftware(SoftwarePackage pkg)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(pkg.ExeName))
+                    return false;
+
+                var processName = Path.GetFileNameWithoutExtension(pkg.ExeName);
+                var processes = Process.GetProcessesByName(processName);
+
+                foreach (var proc in processes)
+                {
+                    proc.CloseMainWindow();
+                    if (!proc.WaitForExit(5000))
+                    {
+                        proc.Kill();
+                    }
+                    proc.Dispose();
+                }
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private void DoSelfUpdate(string packageId)
+        {
+            var result = MessageBox.Show(
+                $"「{packageId}」需要重启以完成更新。",
+                "需要重启",
+                MessageBoxButtons.OKCancel,
+                MessageBoxIcon.Information
+            );
+
+            if (result != DialogResult.OK)
+                return;
+
+            var appsDir = _config.InstallRoot;
+            var bootstrapPath = _config.BootstrapPath;
+            var targetDir = Path.Combine(appsDir, packageId);
+
+            if (!File.Exists(bootstrapPath))
+            {
+                MessageBox.Show($"Bootstrap not found: {bootstrapPath}", "Error");
+                return;
+            }
+
+            // BAT 放到 Temp 目录，并先 cd 到根目录
+            var batPath = Path.Combine(Path.GetTempPath(), $"update_{packageId}.bat");
+
+            var batContent =
+                $@"
+@echo off
+cd /d C:\
+timeout /t 2 /nobreak >nul
+taskkill /F /IM SoftwareManager.exe >nul 2>&1
+taskkill /F /IM Updater.exe >nul 2>&1
+timeout /t 1 /nobreak >nul
+rd /S /Q ""{targetDir}"" >nul 2>&1
+start """" ""{bootstrapPath}""
+del ""%~f0"" >nul 2>&1
+";
+
+            File.WriteAllText(batPath, batContent, new System.Text.UTF8Encoding(false));
+
+            // 关键：设置 WorkingDirectory 为 Temp，避免占用目标目录
+            Process.Start(
+                new ProcessStartInfo
+                {
+                    FileName = "cmd.exe",
+                    Arguments = $"/C \"{batPath}\"",
+                    WindowStyle = ProcessWindowStyle.Hidden,
+                    CreateNoWindow = true,
+                    UseShellExecute = false,
+                    WorkingDirectory = Path.GetTempPath(), // ← 在这里执行，不占目标目录
+                }
+            );
+
+            Application.Exit();
         }
     }
 }

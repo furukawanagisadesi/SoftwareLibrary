@@ -11,7 +11,6 @@ namespace Bootstrap
         {
             _appArg = appArg;
 
-            // 用一个隐藏窗体来驱动消息泵和异步任务
             var driver = new DriverForm();
             driver.Load += async (_, _) => await RunAsync();
             driver.Show();
@@ -20,7 +19,8 @@ namespace Bootstrap
 
         async Task RunAsync()
         {
-            AppHelper.LoadConfig();
+            // LoadConfig 返回非 null 表示需要提示用户实际使用的配置路径
+            var configPromptPath = AppHelper.LoadConfig();
 
             try
             {
@@ -38,7 +38,18 @@ namespace Bootstrap
                 return;
             }
 
-            AppHelper.WriteConfig();
+            // 仅在需要提示时弹窗，告知用户实际使用的配置
+            if (configPromptPath != null)
+            {
+                MessageBox.Show(
+                    $"实际使用的配置文件：\n{configPromptPath}\n\n服务器地址：{AppHelper.ServerUrl}\n安装目录：{AppHelper.InstallRoot}",
+                    "配置信息",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information
+                );
+            }
+
+            // 仅复制 Bootstrap.exe 自身到 InstallDir，不再复制 config.json
             CopySelfToInstallDir();
 
             var (updaterReady, offline) = await EnsureUpdaterAsync();
@@ -58,19 +69,9 @@ namespace Bootstrap
             try
             {
                 var selfPath = Environment.ProcessPath!;
-                var selfDir = Path.GetDirectoryName(selfPath)!;
                 var bootstrapDest = Path.Combine(AppHelper.InstallDir, "Bootstrap.exe");
-
                 if (!string.Equals(selfPath, bootstrapDest, StringComparison.OrdinalIgnoreCase))
                     File.Copy(selfPath, bootstrapDest, overwrite: true);
-
-                var iniSrc = Path.Combine(selfDir, "config.json");
-                var iniDest = Path.Combine(AppHelper.InstallDir, "config.json");
-                if (
-                    File.Exists(iniSrc)
-                    && !string.Equals(iniSrc, iniDest, StringComparison.OrdinalIgnoreCase)
-                )
-                    File.Copy(iniSrc, iniDest, overwrite: true);
             }
             catch { }
         }
@@ -121,7 +122,8 @@ namespace Bootstrap
                 return (false, false);
             }
 
-            var localVersion = AppHelper.GetLocalUpdaterVersion();
+            // 版本检查改为从 installed.json 读取，不再用 updater-version.txt
+            var localVersion = AppHelper.GetLocalVersion("updater");
             if (localVersion == serverInfo.Version && File.Exists(AppHelper.UpdaterPath))
                 return (true, false);
 
@@ -133,6 +135,9 @@ namespace Bootstrap
         {
             var form = new ProgressForm();
             form.Show();
+
+            // Updater 安装到 apps\updater\
+            var updaterInstallPath = Path.Combine(AppHelper.InstallRoot, "updater");
 
             try
             {
@@ -182,22 +187,28 @@ namespace Bootstrap
                     System.Text.CodePagesEncodingProvider.Instance
                 );
                 var gbk = System.Text.Encoding.GetEncoding("GBK");
-
                 ZipFile.ExtractToDirectory(tempZip, tempDir, gbk);
-
                 File.Delete(tempZip);
 
                 form.SetProgress(95, "安装中...");
+                Directory.CreateDirectory(updaterInstallPath);
                 foreach (var file in Directory.GetFiles(tempDir, "*", SearchOption.AllDirectories))
                 {
                     var relativePath = Path.GetRelativePath(tempDir, file);
-                    var destPath = Path.Combine(AppHelper.InstallDir, relativePath);
+                    var destPath = Path.Combine(updaterInstallPath, relativePath);
                     Directory.CreateDirectory(Path.GetDirectoryName(destPath)!);
                     File.Copy(file, destPath, overwrite: true);
                 }
                 Directory.Delete(tempDir, true);
 
-                AppHelper.SaveLocalUpdaterVersion(info.Version);
+                // 写入 installed.json，统一管理版本记录
+                AppHelper.SaveInstalledRecord(new InstalledRecord
+                {
+                    Id = "updater",
+                    Version = info.Version,
+                    InstallPath = updaterInstallPath,
+                    InstalledAt = DateTime.Now,
+                });
 
                 form.SetProgress(100, "完成！");
                 await Task.Delay(300);
