@@ -1,4 +1,5 @@
-﻿using System.IO.Compression;
+﻿using System.Diagnostics;
+using System.IO.Compression;
 using System.Text.Json;
 
 namespace Bootstrap
@@ -69,9 +70,31 @@ namespace Bootstrap
             try
             {
                 var selfPath = Environment.ProcessPath!;
+                var currentDir = AppContext.BaseDirectory;
                 var bootstrapDest = Path.Combine(AppHelper.InstallDir, "Bootstrap.exe");
+
+                // 复制 Bootstrap.exe 自身
                 if (!string.Equals(selfPath, bootstrapDest, StringComparison.OrdinalIgnoreCase))
+                {
                     File.Copy(selfPath, bootstrapDest, overwrite: true);
+                }
+
+                // 复制当前目录下所有文件（不包括子目录）
+                foreach (var file in Directory.GetFiles(currentDir))
+                {
+                    var fileName = Path.GetFileName(file);
+
+                    // 跳过已复制的 Bootstrap.exe
+                    if (fileName.Equals("Bootstrap.exe", StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    // 跳过配置文件（由 WriteConfig 管理）
+                    if (fileName.Equals("config.json", StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    var destPath = Path.Combine(AppHelper.InstallDir, fileName);
+                    File.Copy(file, destPath, overwrite: true);
+                }
             }
             catch { }
         }
@@ -202,13 +225,15 @@ namespace Bootstrap
                 Directory.Delete(tempDir, true);
 
                 // 写入 installed.json，统一管理版本记录
-                AppHelper.SaveInstalledRecord(new InstalledRecord
-                {
-                    Id = "updater",
-                    Version = info.Version,
-                    InstallPath = updaterInstallPath,
-                    InstalledAt = DateTime.Now,
-                });
+                AppHelper.SaveInstalledRecord(
+                    new InstalledRecord
+                    {
+                        Id = "updater",
+                        Version = info.Version,
+                        InstallPath = updaterInstallPath,
+                        InstalledAt = DateTime.Now,
+                    }
+                );
 
                 form.SetProgress(100, "完成！");
                 await Task.Delay(300);

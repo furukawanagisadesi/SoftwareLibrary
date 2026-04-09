@@ -3,8 +3,8 @@
   "WorkspaceRootPath": "D:\\CSharp\\WorkProject\\SoftwareLibrary\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{C9E98A51-49EC-527F-3B94-8650CAB4D5B7}|SoftwareManager\\SoftwareManager\\SoftwareManager.csproj|d:\\csharp\\workproject\\softwarelibrary\\softwaremanager\\softwaremanager\\mainform.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{C9E98A51-49EC-527F-3B94-8650CAB4D5B7}|SoftwareManager\\SoftwareManager\\SoftwareManager.csproj|solutionrelative:softwaremanager\\softwaremanager\\mainform.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+      "AbsoluteMoniker": "D:0:0:{2D937A21-4D2D-C8A8-954B-B07FE96DE1FD}|Bootstrap\\Bootstrap\\Bootstrap.csproj|d:\\csharp\\workproject\\softwarelibrary\\bootstrap\\bootstrap\\bootstrapcontext.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{2D937A21-4D2D-C8A8-954B-B07FE96DE1FD}|Bootstrap\\Bootstrap\\Bootstrap.csproj|solutionrelative:bootstrap\\bootstrap\\bootstrapcontext.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     }
   ],
   "DocumentGroupContainers": [
@@ -19,14 +19,14 @@
             {
               "$type": "Document",
               "DocumentIndex": 0,
-              "Title": "MainForm.cs",
-              "DocumentMoniker": "D:\\CSharp\\WorkProject\\SoftwareLibrary\\SoftwareManager\\SoftwareManager\\MainForm.cs",
-              "RelativeDocumentMoniker": "SoftwareManager\\SoftwareManager\\MainForm.cs",
-              "ToolTip": "D:\\CSharp\\WorkProject\\SoftwareLibrary\\SoftwareManager\\SoftwareManager\\MainForm.cs",
-              "RelativeToolTip": "SoftwareManager\\SoftwareManager\\MainForm.cs",
-              "ViewState": "AgIAAN0BAAAAAAAAAAAwwOsBAAAiAAAAAAAAAA==",
+              "Title": "BootstrapContext.cs",
+              "DocumentMoniker": "D:\\CSharp\\WorkProject\\SoftwareLibrary\\Bootstrap\\Bootstrap\\BootstrapContext.cs",
+              "RelativeDocumentMoniker": "Bootstrap\\Bootstrap\\BootstrapContext.cs",
+              "ToolTip": "D:\\CSharp\\WorkProject\\SoftwareLibrary\\Bootstrap\\Bootstrap\\BootstrapContext.cs",
+              "RelativeToolTip": "Bootstrap\\Bootstrap\\BootstrapContext.cs",
+              "ViewState": "AgIAAEwAAAAAAAAAAAAwwGMAAAAJAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-04-09T02:23:46.756Z",
+              "WhenOpened": "2026-04-09T06:40:40.141Z",
               "EditorCaption": ""
             }
           ]

@@ -9,11 +9,13 @@ namespace Updater
         private readonly string _appId;
         private readonly bool _offline;
         private readonly DriverForm _driver;
+        private readonly string _handlePath;
 
         public UpdaterContext(string appId, bool offline)
         {
             _appId = appId;
             _offline = offline;
+            _handlePath = Path.Combine(AppHelper.InstallDir, "handle.exe");
 
             _driver = new DriverForm();
             _driver.Load += async (_, _) =>
@@ -86,17 +88,24 @@ namespace Updater
             try
             {
                 await DownloadAndExtract(appId, serverInfo, installPath, form);
-                AppHelper.SaveInstalledRecord(new InstalledRecord
-                {
-                    Id = appId,
-                    Version = serverInfo.Version,
-                    InstallPath = installPath,
-                    InstalledAt = DateTime.Now,
-                });
+                AppHelper.SaveInstalledRecord(
+                    new InstalledRecord
+                    {
+                        Id = appId,
+                        Version = serverInfo.Version,
+                        InstallPath = installPath,
+                        InstalledAt = DateTime.Now,
+                    }
+                );
                 form.Close();
 
                 if (appId == "softwaremanager")
-                    CreateShortcut("软件管理器", installPath, serverInfo.ExeName, "--app=softwaremanager");
+                    CreateShortcut(
+                        "软件管理器",
+                        installPath,
+                        serverInfo.ExeName,
+                        "--app=softwaremanager"
+                    );
 
                 await LaunchApp(installPath, serverInfo.ExeName, appId);
             }
@@ -160,13 +169,15 @@ namespace Updater
                         try
                         {
                             await DownloadAndExtract(appId, serverInfo, installPath, form2);
-                            AppHelper.SaveInstalledRecord(new InstalledRecord
-                            {
-                                Id = appId,
-                                Version = serverInfo.Version,
-                                InstallPath = installPath,
-                                InstalledAt = DateTime.Now,
-                            });
+                            AppHelper.SaveInstalledRecord(
+                                new InstalledRecord
+                                {
+                                    Id = appId,
+                                    Version = serverInfo.Version,
+                                    InstallPath = installPath,
+                                    InstalledAt = DateTime.Now,
+                                }
+                            );
                             form2.Close();
                             await LaunchApp(installPath, serverInfo.ExeName, appId);
                         }
@@ -210,13 +221,18 @@ namespace Updater
                     return;
 
                 // 下载新版 Bootstrap 到临时文件，再覆盖
-                var tempZip = Path.Combine(Path.GetTempPath(), $"bootstrap_{serverInfo.Version}.zip");
+                var tempZip = Path.Combine(
+                    Path.GetTempPath(),
+                    $"bootstrap_{serverInfo.Version}.zip"
+                );
                 var tempDir = Path.Combine(Path.GetTempPath(), $"bootstrap_{serverInfo.Version}");
 
-                using (var response = await http.GetAsync(
-                    "/api/software/bootstrap/download",
-                    HttpCompletionOption.ResponseHeadersRead
-                ))
+                using (
+                    var response = await http.GetAsync(
+                        "/api/software/bootstrap/download",
+                        HttpCompletionOption.ResponseHeadersRead
+                    )
+                )
                 {
                     response.EnsureSuccessStatusCode();
                     await using var fs = new FileStream(tempZip, FileMode.Create);
@@ -227,7 +243,9 @@ namespace Updater
                         await fs.WriteAsync(buffer.AsMemory(0, read));
                 }
 
-                System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
+                System.Text.Encoding.RegisterProvider(
+                    System.Text.CodePagesEncodingProvider.Instance
+                );
                 var gbk = System.Text.Encoding.GetEncoding("GBK");
                 if (Directory.Exists(tempDir))
                     Directory.Delete(tempDir, true);
@@ -244,13 +262,15 @@ namespace Updater
                 }
                 Directory.Delete(tempDir, true);
 
-                AppHelper.SaveInstalledRecord(new InstalledRecord
-                {
-                    Id = "bootstrap",
-                    Version = serverInfo.Version,
-                    InstallPath = AppHelper.InstallDir,
-                    InstalledAt = DateTime.Now,
-                });
+                AppHelper.SaveInstalledRecord(
+                    new InstalledRecord
+                    {
+                        Id = "bootstrap",
+                        Version = serverInfo.Version,
+                        InstallPath = AppHelper.InstallDir,
+                        InstalledAt = DateTime.Now,
+                    }
+                );
             }
             catch
             {
@@ -347,12 +367,30 @@ namespace Updater
             }
 
             Directory.CreateDirectory(installPath);
+
+            // 预关闭整个目录句柄
+            CloseDirectoryHandles(installPath);
+            Thread.Sleep(200);
+
             foreach (var file in Directory.GetFiles(tempDir, "*", SearchOption.AllDirectories))
             {
                 var relativePath = Path.GetRelativePath(tempDir, file);
                 var destPath = Path.Combine(installPath, relativePath);
                 Directory.CreateDirectory(Path.GetDirectoryName(destPath)!);
-                File.Copy(file, destPath, overwrite: true);
+
+                // 智能复制：先尝试，失败则解锁
+                try
+                {
+                    if (File.Exists(destPath))
+                        File.SetAttributes(destPath, FileAttributes.Normal);
+                    File.Copy(file, destPath, overwrite: true);
+                }
+                catch (IOException)
+                {
+                    TryCloseHandles(destPath);
+                    Thread.Sleep(300);
+                    File.Copy(file, destPath, overwrite: true);
+                }
             }
             Directory.Delete(tempDir, true);
 
@@ -376,7 +414,11 @@ namespace Updater
 
             if (string.IsNullOrEmpty(exeName))
             {
-                var exeFiles = Directory.GetFiles(installPath, "*.exe", SearchOption.TopDirectoryOnly);
+                var exeFiles = Directory.GetFiles(
+                    installPath,
+                    "*.exe",
+                    SearchOption.TopDirectoryOnly
+                );
                 if (exeFiles.Length == 0)
                 {
                     MessageBox.Show(
@@ -413,11 +455,13 @@ namespace Updater
             splash.Show();
             splash.SetProgress(50, "正在启动...");
 
-            Process.Start(new ProcessStartInfo(exePath)
-            {
-                UseShellExecute = true,
-                WorkingDirectory = AppHelper.InstallDir,
-            });
+            Process.Start(
+                new ProcessStartInfo(exePath)
+                {
+                    UseShellExecute = true,
+                    WorkingDirectory = AppHelper.InstallDir,
+                }
+            );
 
             splash.SetProgress(100, "启动完成");
             await Task.Delay(800);
@@ -478,11 +522,63 @@ $s.Save()
                 File.SetAttributes(file, FileAttributes.Normal);
                 File.Delete(file);
             }
-            foreach (var dir in Directory
-                .GetDirectories(path, "*", SearchOption.AllDirectories)
-                .OrderByDescending(d => d.Length))
+            foreach (
+                var dir in Directory
+                    .GetDirectories(path, "*", SearchOption.AllDirectories)
+                    .OrderByDescending(d => d.Length)
+            )
                 Directory.Delete(dir, false);
             Directory.Delete(path, false);
+        }
+
+        // 关闭指定文件的句柄
+        private bool TryCloseHandles(string filePath)
+        {
+            if (!File.Exists(_handlePath))
+                return false;
+
+            try
+            {
+                var psi = new ProcessStartInfo
+                {
+                    FileName = _handlePath,
+                    Arguments = $"-accepteula \"{filePath}\" -c -y",
+                    WindowStyle = ProcessWindowStyle.Hidden,
+                    CreateNoWindow = true,
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                };
+
+                using var proc = Process.Start(psi);
+                proc?.WaitForExit(3000);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        // 关闭目录的所有句柄
+        private void CloseDirectoryHandles(string dirPath)
+        {
+            if (!File.Exists(_handlePath))
+                return;
+
+            try
+            {
+                var psi = new ProcessStartInfo
+                {
+                    FileName = _handlePath,
+                    Arguments = $"-accepteula \"{dirPath}\" -c -y",
+                    WindowStyle = ProcessWindowStyle.Hidden,
+                    CreateNoWindow = true,
+                    UseShellExecute = false,
+                };
+                using var proc = Process.Start(psi);
+                proc?.WaitForExit(5000);
+            }
+            catch { }
         }
     }
 }
