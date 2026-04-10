@@ -1,5 +1,6 @@
 ﻿using System.Diagnostics;
 using System.IO.Compression;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 
 namespace Updater
@@ -390,7 +391,7 @@ namespace Updater
             Application.Exit();
         }
 
-        // 统一的快捷方式创建方法，SoftwareManager 和其他软件共用
+        // 统一的快捷方式创建方法，使用 COM 直接创建（不用 PowerShell 脚本）
         void CreateShortcut(string name, string installPath, string exeName, string bootstrapArgs)
         {
             var shortcutPath = Path.Combine(
@@ -399,40 +400,39 @@ namespace Updater
             );
             var exePath = Path.Combine(installPath, exeName);
 
-            var script = $"""
-$ws = New-Object -ComObject WScript.Shell
-$s  = $ws.CreateShortcut('{shortcutPath}')
-$s.TargetPath       = '{AppHelper.BootstrapPath}'
-$s.Arguments        = '{bootstrapArgs}'
-$s.WorkingDirectory = '{AppHelper.InstallDir}'
-$s.Description      = '{name}'
-$s.IconLocation     = '{exePath},0'
-$s.Save()
-""";
+            dynamic? shell = null;
+            dynamic? shortcut = null;
 
-            var scriptPath = Path.Combine(Path.GetTempPath(), $"shortcut_{name}.ps1");
-            File.WriteAllText(scriptPath, script, System.Text.Encoding.UTF8);
-
-            var psi = new ProcessStartInfo(
-                "powershell",
-                $"-NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"{scriptPath}\""
-            )
+            try
             {
-                CreateNoWindow = true,
-                UseShellExecute = false,
-                RedirectStandardError = true,
-            };
+                shell = Activator.CreateInstance(Type.GetTypeFromProgID("WScript.Shell")!);
+                shortcut = shell.CreateShortcut(shortcutPath);
 
-            var proc = Process.Start(psi);
-            var error = proc?.StandardError.ReadToEnd();
-            proc?.WaitForExit();
-            File.Delete(scriptPath);
+                shortcut.TargetPath = AppHelper.BootstrapPath;
 
-            if (!string.IsNullOrEmpty(error))
+                // ← 修复：如果 bootstrapArgs 包含空格，确保引号正确
+                // bootstrapArgs 格式是：--app=xxx 或 --app=xxx --offline
+                shortcut.Arguments = bootstrapArgs;
+                shortcut.WorkingDirectory = AppHelper.InstallDir;
+                shortcut.Description = name;
+                shortcut.IconLocation = $"{exePath},0";
+
+                shortcut.Save();
+            }
+            catch (Exception ex)
+            {
                 File.AppendAllText(
                     Path.Combine(AppHelper.InstallDir, "error.log"),
-                    $"Time: {DateTime.Now}\n创建快捷方式错误：{error}"
+                    $"Time: {DateTime.Now}\n创建快捷方式错误：{ex.Message}\n"
                 );
+            }
+            finally
+            {
+                if (shortcut != null)
+                    Marshal.ReleaseComObject(shortcut);
+                if (shell != null)
+                    Marshal.ReleaseComObject(shell);
+            }
         }
 
         static void CleanDirectory(string path)

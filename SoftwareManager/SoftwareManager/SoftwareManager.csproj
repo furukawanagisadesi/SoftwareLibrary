@@ -11,4 +11,8 @@
     <Folder Include="Models\" />
     <Folder Include="Services\" />
   </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Runtime.InteropServices" Version="4.3.0" />
+  </ItemGroup>
 </Project>

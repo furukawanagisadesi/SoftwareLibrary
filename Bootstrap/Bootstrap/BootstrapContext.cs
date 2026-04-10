@@ -60,8 +60,20 @@ namespace Bootstrap
                 return;
             }
 
-            var launchArg = offline ? $"{_appArg} --offline" : _appArg;
+            var args = new List<string>();
+
+            // 关键：appArg 包含空格时，必须加引号
+            if (_appArg.Contains(' '))
+                args.Add($"\"{_appArg}\"");
+            else
+                args.Add(_appArg);
+
+            if (offline)
+                args.Add("--offline");
+
+            var launchArg = string.Join(" ", args);
             AppHelper.LaunchUpdater(launchArg);
+
             Application.Exit();
         }
 

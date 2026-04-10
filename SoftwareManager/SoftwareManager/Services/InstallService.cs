@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.IO.Compression;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using SoftwareManager.Models;
 
@@ -13,7 +14,9 @@ public class InstallService
     // 系统组件：显示在列表里但禁止卸载
     public static readonly HashSet<string> SystemIds = new(StringComparer.OrdinalIgnoreCase)
     {
-        "bootstrap", "updater", "softwaremanager"
+        "bootstrap",
+        "updater",
+        "softwaremanager",
     };
 
     public InstallService(AppConfig config)
@@ -40,10 +43,11 @@ public class InstallService
         try
         {
             var json = File.ReadAllText(_config.InstalledRecordPath);
-            var records = JsonSerializer.Deserialize<List<InstalledRecord>>(
-                json,
-                new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
-            ) ?? [];
+            var records =
+                JsonSerializer.Deserialize<List<InstalledRecord>>(
+                    json,
+                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
+                ) ?? [];
 
             // 过滤掉安装未完成的（有 .installing 标记的）
             return records
@@ -54,7 +58,10 @@ public class InstallService
                 })
                 .ToList();
         }
-        catch { return []; }
+        catch
+        {
+            return [];
+        }
     }
 
     // 下载并安装（解压）软件，progress 回调返回 0~100
@@ -93,7 +100,9 @@ public class InstallService
                 {
                     sw.Restart();
                     var pct = (int)((double)downloaded / total * 50);
-                    progress.Report((pct, $"下载中 {FormatSize(downloaded)} / {FormatSize(total)}"));
+                    progress.Report(
+                        (pct, $"下载中 {FormatSize(downloaded)} / {FormatSize(total)}")
+                    );
                 }
             }
         }
@@ -149,13 +158,15 @@ public class InstallService
 
         // 4. 写入安装记录
         progress.Report((95, "记录安装信息..."));
-        SaveRecord(new InstalledRecord
-        {
-            Id = pkg.Id,
-            Version = pkg.Version,
-            InstallPath = installPath,
-            InstalledAt = DateTime.Now,
-        });
+        SaveRecord(
+            new InstalledRecord
+            {
+                Id = pkg.Id,
+                Version = pkg.Version,
+                InstallPath = installPath,
+                InstalledAt = DateTime.Now,
+            }
+        );
 
         progress.Report((100, "安装完成！"));
 
@@ -172,16 +183,18 @@ public class InstallService
             Directory.Delete(rec.InstallPath, true);
 
         // 删除桌面快捷方式，按软件名查找
-        var pkg = rec != null
-            ? Path.GetFileName(rec.InstallPath) // fallback
-            : id;
+        var pkg =
+            rec != null
+                ? Path.GetFileName(rec.InstallPath) // fallback
+                : id;
         var desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
         // 遍历桌面找到指向该 installPath 的 .lnk（名称可能和 id 不同）
         foreach (var lnk in Directory.GetFiles(desktopPath, "*.lnk"))
         {
             // 用文件名和 id 匹配做简单清理
-            if (Path.GetFileNameWithoutExtension(lnk)
-                .Equals(id, StringComparison.OrdinalIgnoreCase))
+            if (
+                Path.GetFileNameWithoutExtension(lnk).Equals(id, StringComparison.OrdinalIgnoreCase)
+            )
             {
                 File.Delete(lnk);
                 break;
@@ -192,41 +205,46 @@ public class InstallService
         SaveRecords(records);
     }
 
+    // 创建桌面快捷方式，使用 COM 直接创建（不用 PowerShell 脚本）
     private void CreateShortcut(SoftwarePackage pkg, string installPath)
     {
         var desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
         var shortcutPath = Path.Combine(desktopPath, $"{pkg.Name}.lnk");
         var exePath = Path.Combine(installPath, pkg.ExeName);
 
-        // 所有软件的快捷方式统一指向 Bootstrap，WorkingDirectory 为 InstallDir
-        var script = $"""
-$ws = New-Object -ComObject WScript.Shell
-$s  = $ws.CreateShortcut('{shortcutPath}')
-$s.TargetPath       = '{_config.BootstrapPath}'
-$s.Arguments        = '--app={pkg.Id}'
-$s.WorkingDirectory = '{_config.InstallDir}'
-$s.Description      = '{pkg.Name}'
-$s.IconLocation     = '{exePath},0'
-$s.Save()
-""";
+        dynamic? shell = null;
+        dynamic? shortcut = null;
 
-        var scriptPath = Path.Combine(Path.GetTempPath(), $"shortcut_{pkg.Id}.ps1");
-        File.WriteAllText(scriptPath, script, System.Text.Encoding.UTF8);
-
-        var psi = new ProcessStartInfo(
-            "powershell",
-            $"-NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"{scriptPath}\""
-        )
+        try
         {
-            CreateNoWindow = true,
-            UseShellExecute = false,
-            RedirectStandardError = true,
-        };
+            shell = Activator.CreateInstance(Type.GetTypeFromProgID("WScript.Shell")!);
+            shortcut = shell.CreateShortcut(shortcutPath);
 
-        var proc = Process.Start(psi);
-        proc?.StandardError.ReadToEnd();
-        proc?.WaitForExit();
-        File.Delete(scriptPath);
+            shortcut.TargetPath = _config.BootstrapPath;
+
+            // ← 修复：参数值包含空格时，用引号包裹
+            var args = pkg.Id.Contains(' ')
+                ? $"--app=\"{pkg.Id}\"" // 有空格：--app="clash party"
+                : $"--app={pkg.Id}"; // 无空格：--app=chrome
+
+            shortcut.Arguments = args;
+            shortcut.WorkingDirectory = _config.InstallDir;
+            shortcut.Description = pkg.Name;
+            shortcut.IconLocation = $"{exePath},0";
+
+            shortcut.Save();
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"创建快捷方式错误：{ex.Message}");
+        }
+        finally
+        {
+            if (shortcut != null)
+                Marshal.ReleaseComObject(shortcut);
+            if (shell != null)
+                Marshal.ReleaseComObject(shell);
+        }
     }
 
     private void SaveRecord(InstalledRecord record)
@@ -237,10 +255,11 @@ $s.Save()
             try
             {
                 var json = File.ReadAllText(_config.InstalledRecordPath);
-                records = JsonSerializer.Deserialize<List<InstalledRecord>>(
-                    json,
-                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
-                ) ?? [];
+                records =
+                    JsonSerializer.Deserialize<List<InstalledRecord>>(
+                        json,
+                        new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
+                    ) ?? [];
                 records.RemoveAll(r => string.IsNullOrEmpty(r.Id));
             }
             catch { }
