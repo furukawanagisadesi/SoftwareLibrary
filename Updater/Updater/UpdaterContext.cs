@@ -1,5 +1,4 @@
 ﻿using System.Diagnostics;
-using System.IO.Compression;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 
@@ -250,7 +249,30 @@ namespace Updater
 
             System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
             var gbk = System.Text.Encoding.GetEncoding("GBK");
-            ZipFile.ExtractToDirectory(tempZip, tempDir, gbk);
+
+            using (var fs = File.OpenRead(tempZip))
+            using (var zip = new ICSharpCode.SharpZipLib.Zip.ZipFile(fs))
+            {
+                // 告诉 SharpZipLib：文件名字节优先用 UTF-8 解，失败则 fallback 到 GBK
+                zip.StringCodec = ICSharpCode.SharpZipLib.Zip.StringCodec.FromCodePage(
+                    gbk.CodePage
+                );
+
+                foreach (ICSharpCode.SharpZipLib.Zip.ZipEntry entry in zip)
+                {
+                    if (!entry.IsFile)
+                        continue;
+
+                    var entryName = entry.Name.Replace('/', Path.DirectorySeparatorChar);
+                    var destPath = Path.Combine(tempDir, entryName);
+                    Directory.CreateDirectory(Path.GetDirectoryName(destPath)!);
+
+                    using var input = zip.GetInputStream(entry);
+                    using var output = File.Create(destPath);
+                    input.CopyTo(output);
+                }
+            }
+
             File.Delete(tempZip);
 
             form.SetProgress(92, "安装中...");

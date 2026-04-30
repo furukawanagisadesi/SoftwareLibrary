@@ -60,6 +60,59 @@ public class AdminController : ControllerBase
         return Ok(pkg);
     }
 
+    // 批量发布（多个 zip，文件名即软件ID和启动EXE名，版本默认 1.0）
+    [HttpPost("software/batch")]
+    [RequestSizeLimit(2L * 1024 * 1024 * 1024)]
+    public async Task<IActionResult> BatchPublish([FromForm] List<IFormFile> zipFiles)
+    {
+        if (zipFiles == null || zipFiles.Count == 0)
+            return BadRequest(new { message = "请上传至少一个 zip 文件" });
+
+        var results = new List<object>();
+        foreach (var file in zipFiles)
+        {
+            var baseName = Path.GetFileNameWithoutExtension(file.FileName);
+            var id = baseName.ToLower();
+            if (string.IsNullOrWhiteSpace(id))
+                continue;
+
+            try
+            {
+                var req = new PublishRequest
+                {
+                    Version = "1.0",
+                    Name = baseName,
+                    ExeName = baseName + ".exe",
+                    Description = "",
+                };
+                var pkg = await _service.PublishAsync(id, file, req);
+                results.Add(new { id = pkg.Id, success = true });
+            }
+            catch (Exception ex)
+            {
+                results.Add(
+                    new
+                    {
+                        id,
+                        success = false,
+                        error = ex.Message,
+                    }
+                );
+            }
+        }
+        return Ok(results);
+    }
+
+    // 仅修改软件信息（不重新上传包）
+    [HttpPut("software/{id}")]
+    public IActionResult UpdateInfo(string id, [FromBody] PublishRequest req)
+    {
+        var success = _service.UpdateInfo(id, req);
+        if (!success)
+            return NotFound(new { message = $"软件 {id} 不存在" });
+        return Ok(new { message = "更新成功" });
+    }
+
     // 删除软件
     [HttpDelete("software/{id}")]
     public IActionResult Delete(string id)

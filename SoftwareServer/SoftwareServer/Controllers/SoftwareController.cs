@@ -30,7 +30,8 @@ public class SoftwareController : ControllerBase
     public IActionResult GetInfo(string id)
     {
         var pkg = _service.GetById(id);
-        if (pkg == null) return NotFound(new { message = $"软件 {id} 不存在" });
+        if (pkg == null)
+            return NotFound(new { message = $"软件 {id} 不存在" });
         return Ok(pkg);
     }
 
@@ -39,7 +40,8 @@ public class SoftwareController : ControllerBase
     public IActionResult Download(string id)
     {
         var zipPath = _service.GetZipPath(id);
-        if (zipPath == null) return NotFound(new { message = $"软件 {id} 的安装包不存在" });
+        if (zipPath == null)
+            return NotFound(new { message = $"软件 {id} 的安装包不存在" });
 
         var pkg = _service.GetById(id)!;
         var stream = new FileStream(zipPath, FileMode.Open, FileAccess.Read);

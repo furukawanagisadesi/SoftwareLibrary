@@ -97,6 +97,28 @@ public class SoftwareService
         }
     }
 
+    // 仅更新软件信息，不替换 zip 包
+    public bool UpdateInfo(string id, PublishRequest req)
+    {
+        var list = GetAll();
+        var pkg = list.FirstOrDefault(s => s.Id == id);
+        if (pkg == null)
+            return false;
+
+        if (!string.IsNullOrWhiteSpace(req.Name))
+            pkg.Name = req.Name;
+        if (!string.IsNullOrWhiteSpace(req.Version))
+            pkg.Version = req.Version;
+        if (!string.IsNullOrWhiteSpace(req.ExeName))
+            pkg.ExeName = req.ExeName;
+        if (req.Description != null)
+            pkg.Description = req.Description;
+        pkg.UpdatedAt = DateTime.Now;
+
+        SaveList(list);
+        return true;
+    }
+
     // 删除软件
     public bool Delete(string id)
     {

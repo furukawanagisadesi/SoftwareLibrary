@@ -457,6 +457,27 @@
             </div>
 
             <div class="card">
+                <div class="card-title">📂 批量上传软件</div>
+                <p style="font-size:13px;color:#888;margin-bottom:16px">文件名即软件ID，版本默认 1.0，名称/EXE 可上传后在列表中编辑</p>
+                <div class="upload-area" id="batchArea">
+                    <div class="icon">📂</div>
+                    <p>点击选择或拖拽多个 ZIP 文件到此处</p>
+                    <div class="file-name" id="batchFileNames"></div>
+                </div>
+                <input type="file" id="batchFileInput" accept=".zip" multiple style="display:none" />
+                <div class="progress-wrap" id="batchProgressWrap">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="batchProgressFill"></div>
+                    </div>
+                    <div class="progress-text" id="batchProgressText">0%</div>
+                </div>
+                <div style="margin-top:16px;display:flex;gap:10px;align-items:center">
+                    <button class="btn btn-primary" onclick="batchUpload()">开始批量上传</button>
+                    <span id="batchStatus" style="font-size:13px;color:#666"></span>
+                </div>
+            </div>
+
+            <div class="card">
                 <div class="card-title">🚀 发布 / 更新软件</div>
                 <div class="form-grid">
                     <div class="form-group">
@@ -517,11 +538,47 @@
         </div>
     </div>
 
+    <!-- 编辑弹窗 -->
+    <div class="modal-bg" id="editModal">
+        <div class="modal" style="width:440px">
+            <h3>✏️ 编辑软件信息</h3>
+            <p style="margin-bottom:16px">修改后不会重新上传包，仅更新元数据</p>
+            <div style="display:flex;flex-direction:column;gap:12px">
+                <div class="form-group">
+                    <label>软件 ID</label>
+                    <input id="eId" disabled style="background:#f5f5f5;color:#999" />
+                </div>
+                <div class="form-group">
+                    <label>软件名称</label>
+                    <input id="eName" />
+                </div>
+                <div class="form-group">
+                    <label>版本号</label>
+                    <input id="eVersion" />
+                </div>
+                <div class="form-group">
+                    <label>启动 EXE 文件名</label>
+                    <input id="eExe" />
+                </div>
+                <div class="form-group">
+                    <label>描述</label>
+                    <textarea id="eDesc"></textarea>
+                </div>
+            </div>
+            <div class="modal-btns" style="margin-top:20px">
+                <button class="btn" onclick="closeEditModal()" style="background:#f0f0f0">取消</button>
+                <button class="btn btn-primary" onclick="confirmEdit()">保存</button>
+            </div>
+        </div>
+    </div>
+
     <div class="toast" id="toast"></div>
 
     <script>
         let selectedFile = null;
         let deleteTargetId = null;
+        let editTargetId = null;
+        let batchFiles = [];
 
         // ── 登录 / 密钥管理 ──────────────────────────────
         const SESSION_KEY = 'admin_key';
@@ -610,18 +667,19 @@
                 return;
             }
             tbody.innerHTML = list.map(pkg => `
-            <tr>
-              <td><code style="background:#f5f5f5;padding:2px 6px;border-radius:4px">${pkg.id}</code></td>
-              <td><strong>${pkg.name}</strong></td>
-              <td><span class="badge badge-blue">${pkg.version}</span></td>
-              <td style="color:#666;font-size:13px">${pkg.exeName}</td>
-              <td style="color:#666;font-size:13px">${formatSize(pkg.fileSize)}</td>
-              <td style="color:#666;font-size:13px">${formatDate(pkg.updatedAt)}</td>
-              <td>
-                <button class="btn btn-danger btn-sm" onclick="askDelete('${pkg.id}', '${pkg.name}')">删除</button>
-              </td>
-            </tr>
-          `).join('');
+                <tr>
+                  <td><code style="background:#f5f5f5;padding:2px 6px;border-radius:4px">${pkg.id}</code></td>
+                  <td><strong>${pkg.name}</strong></td>
+                  <td><span class="badge badge-blue">${pkg.version}</span></td>
+                  <td style="color:#666;font-size:13px">${pkg.exeName}</td>
+                  <td style="color:#666;font-size:13px">${formatSize(pkg.fileSize)}</td>
+                  <td style="color:#666;font-size:13px">${formatDate(pkg.updatedAt)}</td>
+                  <td style="display:flex;gap:6px">
+                    <button class="btn btn-sm" style="background:#f0f0f0" onclick='openEdit(${JSON.stringify(pkg)})'>编辑</button>
+                    <button class="btn btn-danger btn-sm" onclick="askDelete('${pkg.id}', '${pkg.name}')">删除</button>
+                  </td>
+                </tr>
+              `).join('');
         }
 
         // ── 发布 ─────────────────────────────────────────
@@ -710,6 +768,120 @@
                 doLogout();
             } else {
                 showToast('删除失败', 'error');
+            }
+        }
+
+        // ── 批量上传交互 ──────────────────────────────────
+        const batchArea = document.getElementById('batchArea');
+        const batchFileInput = document.getElementById('batchFileInput');
+
+        batchArea.onclick = () => batchFileInput.click();
+        batchFileInput.onchange = () => setBatchFiles(Array.from(batchFileInput.files));
+        batchArea.ondragover = (e) => { e.preventDefault(); batchArea.classList.add('drag-over'); };
+        batchArea.ondragleave = () => batchArea.classList.remove('drag-over');
+        batchArea.ondrop = (e) => {
+            e.preventDefault();
+            batchArea.classList.remove('drag-over');
+            const files = Array.from(e.dataTransfer.files).filter(f => f.name.endsWith('.zip'));
+            if (files.length) setBatchFiles(files);
+            else showToast('请上传 .zip 格式文件', 'error');
+        };
+
+        function setBatchFiles(files) {
+            batchFiles = files;
+            document.getElementById('batchFileNames').textContent =
+                files.length === 1 ? files[0].name : `已选择 ${files.length} 个文件`;
+        }
+
+        async function batchUpload() {
+            if (!batchFiles.length) return showToast('请先选择文件', 'error');
+
+            const formData = new FormData();
+            batchFiles.forEach(f => formData.append('zipFiles', f));
+
+            document.getElementById('batchProgressWrap').style.display = 'block';
+            document.getElementById('batchStatus').textContent = '上传中...';
+
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', '/api/admin/software/batch');
+            xhr.setRequestHeader('X-Admin-Key', getKey());
+
+            xhr.upload.onprogress = (e) => {
+                if (e.lengthComputable) {
+                    const pct = Math.round(e.loaded / e.total * 100);
+                    document.getElementById('batchProgressFill').style.width = pct + '%';
+                    document.getElementById('batchProgressText').textContent = pct + '%';
+                }
+            };
+
+            xhr.onload = () => {
+                document.getElementById('batchProgressWrap').style.display = 'none';
+                if (xhr.status === 200) {
+                    const results = JSON.parse(xhr.responseText);
+                    const ok = results.filter(r => r.success).length;
+                    const fail = results.filter(r => !r.success);
+                    let msg = `✅ 成功上传 ${ok} 个`;
+                    if (fail.length) msg += `，${fail.length} 个失败: ${fail.map(r => r.id).join(', ')}`;
+                    document.getElementById('batchStatus').textContent = '';
+                    showToast(msg, fail.length ? 'error' : 'success');
+                    batchFiles = [];
+                    document.getElementById('batchFileNames').textContent = '';
+                    loadList();
+                } else if (xhr.status === 401) {
+                    doLogout();
+                } else {
+                    document.getElementById('batchStatus').textContent = '';
+                    showToast('上传失败', 'error');
+                }
+            };
+
+            xhr.onerror = () => {
+                document.getElementById('batchProgressWrap').style.display = 'none';
+                document.getElementById('batchStatus').textContent = '';
+                showToast('网络错误', 'error');
+            };
+
+            xhr.send(formData);
+        }
+
+        // ── 编辑 ──────────────────────────────────────────
+        function openEdit(pkg) {
+            editTargetId = pkg.id;
+            document.getElementById('eId').value = pkg.id;
+            document.getElementById('eName').value = pkg.name;
+            document.getElementById('eVersion').value = pkg.version;
+            document.getElementById('eExe').value = pkg.exeName;
+            document.getElementById('eDesc').value = pkg.description || '';
+            document.getElementById('editModal').classList.add('show');
+        }
+
+        function closeEditModal() {
+            document.getElementById('editModal').classList.remove('show');
+            editTargetId = null;
+        }
+
+        async function confirmEdit() {
+            if (!editTargetId) return;
+            const exe = document.getElementById('eExe').value.trim();
+            const body = {
+                name: document.getElementById('eName').value.trim(),
+                version: document.getElementById('eVersion').value.trim(),
+                exeName: exe.toLowerCase().endsWith('.exe') ? exe : exe + '.exe',
+                description: document.getElementById('eDesc').value.trim(),
+            };
+            const res = await authFetch(`/api/admin/software/${editTargetId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+            });
+            closeEditModal();
+            if (res.ok) {
+                showToast('保存成功', 'success');
+                loadList();
+            } else if (res.status === 401) {
+                doLogout();
+            } else {
+                showToast('保存失败', 'error');
             }
         }
 

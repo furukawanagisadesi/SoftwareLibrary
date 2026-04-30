@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.IO.Compression;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using SoftwareManager.Models;
@@ -120,14 +119,18 @@ public class InstallService
         System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
         var gbk = System.Text.Encoding.GetEncoding("GBK");
 
-        using (var zip = ZipFile.Open(tempZip, ZipArchiveMode.Read, gbk))
+        using (var zip = new ICSharpCode.SharpZipLib.Zip.ZipFile(tempZip))
         {
-            var entries = zip.Entries.ToList();
+            zip.StringCodec = ICSharpCode.SharpZipLib.Zip.StringCodec.FromCodePage(gbk.CodePage);
+
+            var entries = zip.Cast<ICSharpCode.SharpZipLib.Zip.ZipEntry>().ToList();
             int total2 = entries.Count;
             for (int i = 0; i < total2; i++)
             {
                 var entry = entries[i];
-                var destPath = Path.GetFullPath(Path.Combine(installPath, entry.FullName));
+                var entryName = entry.Name.Replace('/', Path.DirectorySeparatorChar);
+                var destPath = Path.GetFullPath(Path.Combine(installPath, entryName));
+
                 // 安全检查，防止路径穿越
                 if (
                     !destPath.StartsWith(
@@ -137,12 +140,14 @@ public class InstallService
                 )
                     continue;
 
-                if (entry.FullName.EndsWith('/') || entry.FullName.EndsWith('\\'))
+                if (entry.IsDirectory)
                     Directory.CreateDirectory(destPath);
                 else
                 {
                     Directory.CreateDirectory(Path.GetDirectoryName(destPath)!);
-                    entry.ExtractToFile(destPath, overwrite: true);
+                    using var input = zip.GetInputStream(entry);
+                    using var output = File.Create(destPath);
+                    await input.CopyToAsync(output);
                 }
 
                 var pct = 50 + (int)((double)(i + 1) / total2 * 30);
