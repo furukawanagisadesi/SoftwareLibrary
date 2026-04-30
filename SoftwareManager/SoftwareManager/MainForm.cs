@@ -629,23 +629,19 @@ del ""%~f0"" >nul 2>&1
         private void InstallBootstrap(string sourceDir)
         {
             var targetDir = _config.InstallDir;
-            var handlePath = Path.Combine(targetDir, "handle.exe");
-            var exclude = new[]
-            {
-                "config.json",
-                "installed.json",
-                "launch.log",
-                "error.log",
-                "handle.exe",
-            };
+            // exclude 只保留用户数据类文件
+            var exclude = new[] { "config.json", "installed.json", "launch.log", "error.log" };
 
-            // 解锁
+            // 解锁时单独处理 handle.exe：它可能正被占用，先跳过
+            var handlePath = Path.Combine(targetDir, "handle.exe");
             if (File.Exists(handlePath))
             {
                 foreach (var file in Directory.GetFiles(targetDir))
                 {
                     if (exclude.Contains(Path.GetFileName(file)))
                         continue;
+                    if (Path.GetFileName(file) == "handle.exe")
+                        continue; // 自己不能解锁自己
                     TryUnlock(handlePath, file);
                 }
             }

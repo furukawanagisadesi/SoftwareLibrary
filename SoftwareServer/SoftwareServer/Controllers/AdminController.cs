@@ -78,12 +78,16 @@ public class AdminController : ControllerBase
 
             try
             {
+                // 已存在则保留原版本号，新软件才用 1.0
+                var existing = _service.GetById(id);
+                var version = existing?.Version ?? "1.0";
+
                 var req = new PublishRequest
                 {
-                    Version = "1.0",
-                    Name = baseName,
-                    ExeName = baseName + ".exe",
-                    Description = "",
+                    Version = version,
+                    Name = existing?.Name ?? baseName,
+                    ExeName = existing?.ExeName ?? baseName + ".exe",
+                    Description = existing?.Description ?? "",
                 };
                 var pkg = await _service.PublishAsync(id, file, req);
                 results.Add(new { id = pkg.Id, success = true });
