@@ -180,18 +180,21 @@ public class InstallService
     }
 
     // 卸载：系统组件在调用前已被 UI 层拦截，这里不做二次检查
-    public void Uninstall(string id)
+    // 返回 (installPath, exePath) 供调用方做关联扫描
+    public (string InstallPath, string ExePath) Uninstall(string id)
     {
         var records = GetInstalledRecords();
         var rec = records.FirstOrDefault(r => r.Id == id);
+
+        var installPath = rec?.InstallPath ?? "";
+        var pkg = _serverList?.FirstOrDefault(p => p.Id == id);
+        var exePath =
+            (rec != null && pkg != null) ? Path.Combine(rec.InstallPath, pkg.ExeName) : "";
+
         if (rec != null && Directory.Exists(rec.InstallPath))
             Directory.Delete(rec.InstallPath, true);
 
         // 删除桌面快捷方式，按软件名查找
-        var pkg =
-            rec != null
-                ? Path.GetFileName(rec.InstallPath) // fallback
-                : id;
         var desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
         // 遍历桌面找到指向该 installPath 的 .lnk（名称可能和 id 不同）
         foreach (var lnk in Directory.GetFiles(desktopPath, "*.lnk"))
@@ -208,7 +211,14 @@ public class InstallService
 
         records.RemoveAll(r => r.Id == id);
         SaveRecords(records);
+
+        return (installPath, exePath);
     }
+
+    // 缓存服务器列表，供 Uninstall 查 ExeName
+    private List<SoftwarePackage>? _serverList;
+
+    public void CacheServerList(List<SoftwarePackage> list) => _serverList = list;
 
     // 创建桌面快捷方式，使用 COM 直接创建（不用 PowerShell 脚本）
     private void CreateShortcut(SoftwarePackage pkg, string installPath)

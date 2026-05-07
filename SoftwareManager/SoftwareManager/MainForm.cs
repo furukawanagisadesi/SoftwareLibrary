@@ -70,6 +70,7 @@ namespace SoftwareManager
             try
             {
                 _serverList = await _service.GetServerListAsync();
+                _service.CacheServerList(_serverList);
                 _installedList = _service.GetInstalledRecords();
                 RenderList();
                 SetStatus($"已加载 {_serverList.Count} 个软件");
@@ -300,7 +301,7 @@ namespace SoftwareManager
             }
         }
 
-        private void DoUninstall()
+        private async void DoUninstall()
         {
             var pkg = SelectedPackage();
             if (pkg == null)
@@ -318,7 +319,7 @@ namespace SoftwareManager
 
             try
             {
-                _service.Uninstall(pkg.Id);
+                var (installPath, exePath) = _service.Uninstall(pkg.Id);
                 _installedList = _service.GetInstalledRecords();
                 RenderList();
                 SetStatus($"已卸载 {pkg.Name}");
@@ -329,6 +330,9 @@ namespace SoftwareManager
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Information
                 );
+
+                // 卸载后扫描残留注册表和文件
+                DoCleanupScan(pkg.Name, exePath, installPath);
             }
             catch (Exception ex)
             {
@@ -339,6 +343,126 @@ namespace SoftwareManager
                     MessageBoxIcon.Error
                 );
             }
+        }
+
+        private async void DoCleanupScan(string softwareName, string exePath, string installPath)
+        {
+            SetStatus($"正在扫描 {softwareName} 的残留...");
+            SetBusy(true);
+            _progressBar.Style = ProgressBarStyle.Marquee; // 不定进度滚动
+            _progressBar.MarqueeAnimationSpeed = 30;
+            _lblProgress.Text = "扫描中...";
+
+            ScanResult result;
+            try
+            {
+                var exeDir =
+                    Directory.Exists(installPath) ? installPath
+                    : !string.IsNullOrEmpty(exePath) ? Path.GetDirectoryName(exePath) ?? ""
+                    : "";
+
+                var progress = new Progress<string>(msg => _lblProgress.Text = msg);
+                var scanner = new SoftwareManager.Services.AssociationScanner(
+                    softwareName,
+                    exePath,
+                    exeDir
+                );
+                result = await Task.Run(() => scanner.Scan(progress));
+            }
+            catch
+            {
+                SetStatus("扫描失败");
+                SetBusy(false);
+                _progressBar.Style = ProgressBarStyle.Continuous;
+                _progressBar.Value = 0;
+                _lblProgress.Text = "";
+                return;
+            }
+            finally
+            {
+                _progressBar.Style = ProgressBarStyle.Continuous;
+                _progressBar.Value = 0;
+            }
+
+            SetBusy(false);
+            _lblProgress.Text = "";
+            SetStatus("就绪");
+
+            if (result.IsEmpty)
+            {
+                MessageBox.Show(
+                    $"未检测到「{softwareName}」的残留注册表或文件夹。",
+                    "清理完成",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information
+                );
+                return;
+            }
+
+            using var dialog = new CleanupDialog(softwareName, result);
+            if (dialog.ShowDialog(this) != DialogResult.OK)
+                return;
+
+            var checkedItems = dialog.GetCheckedItems();
+            if (checkedItems.Count == 0)
+                return;
+
+            int success = 0,
+                fail = 0;
+            foreach (var item in checkedItems)
+            {
+                try
+                {
+                    if (item.Category == "注册表")
+                        DeleteRegistryKey(item.Path);
+                    else if (item.Category == "文件夹")
+                        Directory.Delete(item.Path, true);
+                    else
+                        File.Delete(item.Path);
+                    success++;
+                }
+                catch
+                {
+                    fail++;
+                }
+            }
+
+            var msg = $"清理完成：成功 {success} 项";
+            if (fail > 0)
+                msg += $"，失败 {fail} 项（可能需要管理员权限）";
+            MessageBox.Show(
+                msg,
+                "清理结果",
+                MessageBoxButtons.OK,
+                fail > 0 ? MessageBoxIcon.Warning : MessageBoxIcon.Information
+            );
+            SetStatus(msg);
+        }
+
+        private static void DeleteRegistryKey(string fullKeyPath)
+        {
+            // fullKeyPath 格式: HKEY_CURRENT_USER\Software\xxx
+            var sep = fullKeyPath.IndexOf('\\');
+            if (sep < 0)
+                return;
+            var hiveName = fullKeyPath[..sep];
+            var subPath = fullKeyPath[(sep + 1)..];
+
+            var hive = hiveName switch
+            {
+                "HKEY_CURRENT_USER" => Microsoft.Win32.RegistryHive.CurrentUser,
+                "HKEY_LOCAL_MACHINE" => Microsoft.Win32.RegistryHive.LocalMachine,
+                "HKEY_CLASSES_ROOT" => Microsoft.Win32.RegistryHive.ClassesRoot,
+                _ => (Microsoft.Win32.RegistryHive?)null,
+            };
+            if (hive == null)
+                return;
+
+            using var baseKey = Microsoft.Win32.RegistryKey.OpenBaseKey(
+                hive.Value,
+                Microsoft.Win32.RegistryView.Default
+            );
+            baseKey.DeleteSubKeyTree(subPath, throwOnMissingSubKey: false);
         }
 
         private void ShowSettings()

@@ -4,6 +4,9 @@
     <_LastSelectedProfileId>D:\CSharp\WorkProject\SoftwareLibrary\SoftwareManager\SoftwareManager\Properties\PublishProfiles\FolderProfile.pubxml</_LastSelectedProfileId>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Update="CleanupDialog.cs">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Update="MainForm.cs">
       <SubType>Form</SubType>
     </Compile>
