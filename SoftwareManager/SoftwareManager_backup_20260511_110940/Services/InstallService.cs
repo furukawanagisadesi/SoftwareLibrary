@@ -5,13 +5,22 @@ using SoftwareManager.Models;
 
 namespace SoftwareManager.Services;
 
-public class InstallService : ServiceBase
+public class InstallService
 {
+    private readonly AppConfig _config;
     private readonly HttpClient _http;
 
-    public InstallService(AppConfig config)
-        : base(config)
+    // 系统组件：显示在列表里但禁止卸载
+    public static readonly HashSet<string> SystemIds = new(StringComparer.OrdinalIgnoreCase)
     {
+        "bootstrap",
+        "updater",
+        "softwaremanager",
+    };
+
+    public InstallService(AppConfig config)
+    {
+        _config = config;
         _http = new HttpClient { BaseAddress = new Uri(config.ServerUrl) };
         _http.Timeout = TimeSpan.FromMinutes(30);
     }
@@ -22,6 +31,36 @@ public class InstallService : ServiceBase
         var json = await _http.GetStringAsync("/api/software/list");
         var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
         return JsonSerializer.Deserialize<List<SoftwarePackage>>(json, options) ?? [];
+    }
+
+    // 读取本地已安装记录
+    public List<InstalledRecord> GetInstalledRecords()
+    {
+        if (!File.Exists(_config.InstalledRecordPath))
+            return [];
+
+        try
+        {
+            var json = File.ReadAllText(_config.InstalledRecordPath);
+            var records =
+                JsonSerializer.Deserialize<List<InstalledRecord>>(
+                    json,
+                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
+                ) ?? [];
+
+            // 过滤掉安装未完成的（有 .installing 标记的）
+            return records
+                .Where(r =>
+                {
+                    var mark = Path.Combine(r.InstallPath, ".installing");
+                    return !File.Exists(mark);
+                })
+                .ToList();
+        }
+        catch
+        {
+            return [];
+        }
     }
 
     // 下载并安装（解压）软件，progress 回调返回 0~100
@@ -140,6 +179,47 @@ public class InstallService : ServiceBase
         File.Delete(tempMark);
     }
 
+    // 卸载：系统组件在调用前已被 UI 层拦截，这里不做二次检查
+    // 返回 (installPath, exePath) 供调用方做关联扫描
+    public (string InstallPath, string ExePath) Uninstall(string id)
+    {
+        var records = GetInstalledRecords();
+        var rec = records.FirstOrDefault(r => r.Id == id);
+
+        var installPath = rec?.InstallPath ?? "";
+        var pkg = _serverList?.FirstOrDefault(p => p.Id == id);
+        var exePath =
+            (rec != null && pkg != null) ? Path.Combine(rec.InstallPath, pkg.ExeName) : "";
+
+        if (rec != null && Directory.Exists(rec.InstallPath))
+            Directory.Delete(rec.InstallPath, true);
+
+        // 删除桌面快捷方式，按软件名查找
+        var desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+        // 遍历桌面找到指向该 installPath 的 .lnk（名称可能和 id 不同）
+        foreach (var lnk in Directory.GetFiles(desktopPath, "*.lnk"))
+        {
+            // 用文件名和 id 匹配做简单清理
+            if (
+                Path.GetFileNameWithoutExtension(lnk).Equals(id, StringComparison.OrdinalIgnoreCase)
+            )
+            {
+                File.Delete(lnk);
+                break;
+            }
+        }
+
+        records.RemoveAll(r => r.Id == id);
+        SaveRecords(records);
+
+        return (installPath, exePath);
+    }
+
+    // 缓存服务器列表，供 Uninstall 查 ExeName
+    private List<SoftwarePackage>? _serverList;
+
+    public void CacheServerList(List<SoftwarePackage> list) => _serverList = list;
+
     // 创建桌面快捷方式，使用 COM 直接创建（不用 PowerShell 脚本）
     private void CreateShortcut(SoftwarePackage pkg, string installPath)
     {
@@ -180,6 +260,38 @@ public class InstallService : ServiceBase
             if (shell != null)
                 Marshal.ReleaseComObject(shell);
         }
+    }
+
+    private void SaveRecord(InstalledRecord record)
+    {
+        var records = new List<InstalledRecord>();
+        if (File.Exists(_config.InstalledRecordPath))
+        {
+            try
+            {
+                var json = File.ReadAllText(_config.InstalledRecordPath);
+                records =
+                    JsonSerializer.Deserialize<List<InstalledRecord>>(
+                        json,
+                        new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
+                    ) ?? [];
+                records.RemoveAll(r => string.IsNullOrEmpty(r.Id));
+            }
+            catch { }
+        }
+
+        records.RemoveAll(r => r.Id == record.Id);
+        records.Add(record);
+        SaveRecords(records);
+    }
+
+    private void SaveRecords(List<InstalledRecord> records)
+    {
+        var json = JsonSerializer.Serialize(
+            records,
+            new JsonSerializerOptions { WriteIndented = true }
+        );
+        File.WriteAllText(_config.InstalledRecordPath, json);
     }
 
     private static string FormatSize(long bytes)

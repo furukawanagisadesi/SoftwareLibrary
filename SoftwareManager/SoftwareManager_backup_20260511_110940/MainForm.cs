@@ -8,8 +8,7 @@ namespace SoftwareManager
     public partial class MainForm : Form
     {
         private AppConfig _config = AppConfig.Load();
-        private InstallService _installService = null!;
-        private UninstallService _uninstallService = null!;
+        private InstallService _service = null!;
 
         private List<SoftwarePackage> _serverList = [];
         private List<InstalledRecord> _installedList = [];
@@ -60,8 +59,7 @@ namespace SoftwareManager
             _btnUninstall.Enabled = false;
 
             // 启动
-            _installService = new InstallService(_config);
-            _uninstallService = new UninstallService(_config);
+            _service = new InstallService(_config);
             _ = RefreshListAsync();
         }
 
@@ -71,10 +69,9 @@ namespace SoftwareManager
             _btnRefresh.Enabled = false;
             try
             {
-                _serverList = await _installService.GetServerListAsync();
-                _installService.CacheServerList(_serverList);
-                _uninstallService.CacheServerList(_serverList);
-                _installedList = _installService.GetInstalledRecords();
+                _serverList = await _service.GetServerListAsync();
+                _service.CacheServerList(_serverList);
+                _installedList = _service.GetInstalledRecords();
                 RenderList();
                 SetStatus($"已加载 {_serverList.Count} 个软件");
             }
@@ -206,7 +203,7 @@ namespace SoftwareManager
             }
 
             var installed = _installedList.FirstOrDefault(r => r.Id == pkg.Id);
-            var isSystemComponent = ServiceBase.SystemIds.Contains(pkg.Id);
+            var isSystemComponent = InstallService.SystemIds.Contains(pkg.Id);
             _btnInstall.Enabled = installed == null;
             _btnReinstall.Enabled = installed != null;
             _btnUninstall.Enabled = installed != null && !isSystemComponent;
@@ -276,8 +273,8 @@ namespace SoftwareManager
 
             try
             {
-                await _installService.InstallAsync(pkg, progress);
-                _installedList = _installService.GetInstalledRecords();
+                await _service.InstallAsync(pkg, progress);
+                _installedList = _service.GetInstalledRecords();
                 RenderList();
                 MessageBox.Show(
                     $"「{pkg.Name}」{action}完成！\n桌面快捷方式已创建。",
@@ -322,8 +319,8 @@ namespace SoftwareManager
 
             try
             {
-                var (installPath, exePath) = _uninstallService.Uninstall(pkg.Id);
-                _installedList = _uninstallService.GetInstalledRecords();
+                var (installPath, exePath) = _service.Uninstall(pkg.Id);
+                _installedList = _service.GetInstalledRecords();
                 RenderList();
                 SetStatus($"已卸载 {pkg.Name}");
 
@@ -417,7 +414,7 @@ namespace SoftwareManager
                 try
                 {
                     if (item.Category == "注册表")
-                        UninstallService.DeleteRegistryKey(item.Path);
+                        DeleteRegistryKey(item.Path);
                     else if (item.Category == "文件夹")
                         Directory.Delete(item.Path, true);
                     else
@@ -440,6 +437,32 @@ namespace SoftwareManager
                 fail > 0 ? MessageBoxIcon.Warning : MessageBoxIcon.Information
             );
             SetStatus(msg);
+        }
+
+        private static void DeleteRegistryKey(string fullKeyPath)
+        {
+            // fullKeyPath 格式: HKEY_CURRENT_USER\Software\xxx
+            var sep = fullKeyPath.IndexOf('\\');
+            if (sep < 0)
+                return;
+            var hiveName = fullKeyPath[..sep];
+            var subPath = fullKeyPath[(sep + 1)..];
+
+            var hive = hiveName switch
+            {
+                "HKEY_CURRENT_USER" => Microsoft.Win32.RegistryHive.CurrentUser,
+                "HKEY_LOCAL_MACHINE" => Microsoft.Win32.RegistryHive.LocalMachine,
+                "HKEY_CLASSES_ROOT" => Microsoft.Win32.RegistryHive.ClassesRoot,
+                _ => (Microsoft.Win32.RegistryHive?)null,
+            };
+            if (hive == null)
+                return;
+
+            using var baseKey = Microsoft.Win32.RegistryKey.OpenBaseKey(
+                hive.Value,
+                Microsoft.Win32.RegistryView.Default
+            );
+            baseKey.DeleteSubKeyTree(subPath, throwOnMissingSubKey: false);
         }
 
         private void ShowSettings()
@@ -503,8 +526,7 @@ namespace SoftwareManager
                 // FirstInitialized 由 Bootstrap 写入，这里不允许清除
                 _config.FirstInitialized = true;
                 _config.Save();
-                _installService = new InstallService(_config);
-                _uninstallService = new UninstallService(_config);
+                _service = new InstallService(_config);
                 form.Close();
                 SetStatus("设置已保存");
                 await RefreshListAsync();
