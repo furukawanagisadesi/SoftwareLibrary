@@ -12,7 +12,13 @@ public class InstallService : ServiceBase
     public InstallService(AppConfig config)
         : base(config)
     {
-        _http = new HttpClient { BaseAddress = new Uri(config.ServerUrl) };
+        // ⚠ 必须禁用代理，否则开启系统代理时 HttpClient 会尝试把 127.0.0.1 的请求发往代理端口导致失败
+        var handler = new HttpClientHandler
+        {
+            UseProxy = false,
+            Proxy = null,
+        };
+        _http = new HttpClient(handler) { BaseAddress = new Uri(config.ServerUrl) };
         _http.Timeout = TimeSpan.FromMinutes(30);
     }
 
