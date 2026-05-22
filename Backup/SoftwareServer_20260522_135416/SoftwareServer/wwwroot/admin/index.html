@@ -831,12 +831,7 @@
                     doLogout();
                 } else {
                     document.getElementById('batchStatus').textContent = '';
-                    try {
-                        const err = JSON.parse(xhr.responseText);
-                        showToast(err.message || '上传失败 (HTTP ' + xhr.status + ')', 'error');
-                    } catch {
-                        showToast('上传失败 (HTTP ' + xhr.status + ')', 'error');
-                    }
+                    showToast('上传失败', 'error');
                 }
             };
 

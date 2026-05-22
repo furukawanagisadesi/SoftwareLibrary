@@ -34,10 +34,7 @@ public class AdminController : ControllerBase
         [FromForm] string version,
         [FromForm] string exeName,
         [FromForm] string? name = null,
-        [FromForm] string? description = null,
-        [FromForm] string? homepage = null,
-        [FromForm] string? license = null,
-        [FromForm] string? persist = null
+        [FromForm] string? description = null
     )
     {
         id = id.ToLower();
@@ -57,9 +54,6 @@ public class AdminController : ControllerBase
             ExeName = exeName,
             Name = name ?? id,
             Description = description,
-            Homepage = homepage,
-            License = license,
-            Persist = persist,
         };
 
         var pkg = await _service.PublishAsync(id, zipFile, req);
@@ -94,9 +88,6 @@ public class AdminController : ControllerBase
                     Name = existing?.Name ?? baseName,
                     ExeName = existing?.ExeName ?? baseName + ".exe",
                     Description = existing?.Description ?? "",
-                    Homepage = existing?.Homepage,
-                    License = existing?.License,
-                    Persist = existing?.Persist is { Count: > 0 } ? string.Join(",", existing.Persist) : null,
                 };
                 var pkg = await _service.PublishAsync(id, file, req);
                 results.Add(new { id = pkg.Id, success = true });
@@ -118,9 +109,9 @@ public class AdminController : ControllerBase
 
     // 仅修改软件信息（不重新上传包）
     [HttpPut("software/{id}")]
-    public async Task<IActionResult> UpdateInfo(string id, [FromBody] PublishRequest req)
+    public IActionResult UpdateInfo(string id, [FromBody] PublishRequest req)
     {
-        var success = await _service.UpdateInfo(id, req);
+        var success = _service.UpdateInfo(id, req);
         if (!success)
             return NotFound(new { message = $"软件 {id} 不存在" });
         return Ok(new { message = "更新成功" });

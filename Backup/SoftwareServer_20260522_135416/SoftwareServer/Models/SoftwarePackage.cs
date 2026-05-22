@@ -10,11 +10,6 @@ public class SoftwarePackage
     public string ZipFileName { get; set; } = ""; // 服务器上的 zip 文件名
     public long FileSize { get; set; } // zip 文件大小（字节）
     public DateTime UpdatedAt { get; set; } // 最后更新时间
-
-    // Scoop Manifest 额外信息（可选）
-    public string? Homepage { get; set; }   // 软件官网
-    public string? License { get; set; }    // 许可证（如 "MIT", "Freeware"）
-    public List<string>? Persist { get; set; } // 需要保留的配置文件/目录
 }
 
 public class SoftwareListResponse
@@ -28,9 +23,4 @@ public class PublishRequest
     public string Description { get; set; } = "";
     public string ExeName { get; set; } = "";
     public string Name { get; set; } = "";
-
-    // Scoop 可选信息（表单传入）
-    public string? Homepage { get; set; }
-    public string? License { get; set; }
-    public string? Persist { get; set; } // 逗号分隔，如 "data,config.ini"
 }
