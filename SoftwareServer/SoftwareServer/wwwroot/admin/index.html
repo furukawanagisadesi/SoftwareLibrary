@@ -75,6 +75,10 @@
             color: #1a1a2e;
         }
 
+        .table-scroll {
+            overflow-x: auto;
+        }
+
         table {
             width: 100%;
             border-collapse: collapse;
@@ -87,6 +91,7 @@
             font-size: 13px;
             color: #666;
             border-bottom: 2px solid #eee;
+            white-space: nowrap;
         }
 
         td {
@@ -94,6 +99,18 @@
             border-bottom: 1px solid #f0f0f0;
             font-size: 14px;
             vertical-align: middle;
+            min-width: 0;
+            word-break: break-word;
+        }
+
+        .cell-actions {
+            display: flex;
+            gap: 6px;
+            white-space: nowrap;
+        }
+
+        td code {
+            word-break: break-all;
         }
 
         tr:hover td {
@@ -436,24 +453,26 @@
 
             <div class="card">
                 <div class="card-title">📦 已发布的软件</div>
-                <table id="softwareTable">
-                    <thead>
-                        <tr>
-                            <th>软件ID</th>
-                            <th>名称</th>
-                            <th>版本</th>
-                            <th>启动文件</th>
-                            <th>包大小</th>
-                            <th>最后更新</th>
-                            <th>操作</th>
-                        </tr>
-                    </thead>
-                    <tbody id="tableBody">
-                        <tr class="empty-row">
-                            <td colspan="7">加载中...</td>
-                        </tr>
-                    </tbody>
-                </table>
+                <div class="table-scroll">
+                    <table id="softwareTable">
+                        <thead>
+                            <tr>
+                                <th>软件ID</th>
+                                <th>名称</th>
+                                <th>版本</th>
+                                <th>启动文件</th>
+                                <th>包大小</th>
+                                <th>最后更新</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody">
+                            <tr class="empty-row">
+                                <td colspan="7">加载中...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
             <div class="card">
@@ -674,10 +693,10 @@
                   <td style="color:#666;font-size:13px">${pkg.exeName}</td>
                   <td style="color:#666;font-size:13px">${formatSize(pkg.fileSize)}</td>
                   <td style="color:#666;font-size:13px">${formatDate(pkg.updatedAt)}</td>
-                  <td style="display:flex;gap:6px">
+                  <td><div class="cell-actions">
                     <button class="btn btn-sm" style="background:#f0f0f0" onclick='openEdit(${JSON.stringify(pkg)})'>编辑</button>
                     <button class="btn btn-danger btn-sm" onclick="askDelete('${pkg.id}', '${pkg.name}')">删除</button>
-                  </td>
+                  </div></td>
                 </tr>
               `).join('');
         }
@@ -886,7 +905,13 @@
             } else if (res.status === 401) {
                 doLogout();
             } else {
-                showToast('保存失败', 'error');
+                // 尝试读取后端返回的具体错误原因
+                let reason = '保存失败';
+                try {
+                    const data = await res.json();
+                    if (data && data.message) reason = data.message;
+                } catch (e) { /* 非 JSON 响应 */ }
+                showToast(reason, 'error');
             }
         }
 

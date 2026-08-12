@@ -1,4 +1,6 @@
+using System.Diagnostics;
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using SoftwareServer.Models;
@@ -10,6 +12,7 @@ public class SoftwareService
     private readonly string _packagesDir;
     private readonly string _metaFile;
     private readonly string _serverUrl;
+    private readonly bool _autoCommitScoop;
     private readonly ILogger<SoftwareService> _logger;
 
     public SoftwareService(IConfiguration config, ILogger<SoftwareService> logger)
@@ -18,6 +21,7 @@ public class SoftwareService
         _packagesDir =
             config["Storage:PackagesDir"] ?? Path.Combine(AppContext.BaseDirectory, "packages");
         _serverUrl = (config["ServerUrl"] ?? "http://localhost:15000").TrimEnd('/');
+        _autoCommitScoop = config.GetValue("Scoop:AutoCommit", true);
         _metaFile = Path.Combine(_packagesDir, "software-list.json");
         Directory.CreateDirectory(_packagesDir);
     }
@@ -109,6 +113,9 @@ public class SoftwareService
             // ★ 生成 Scoop Manifest
             await GenerateScoopManifestAsync(pkg);
 
+            // 自动提交到 scoop bucket git 仓库（使远端立即生效）
+            CommitScoopBucketIfChanged($"publish {id} v{req.Version}");
+
             _logger.LogInformation("发布软件 {Id} 版本 {Version}", id, req.Version);
             return pkg;
         }
@@ -118,41 +125,82 @@ public class SoftwareService
         }
     }
 
-    // 仅更新软件信息，不替换 zip 包
-    public async Task<bool> UpdateInfo(string id, PublishRequest req)
+    // 仅更新软件信息，不替换 zip 包；支持修改版本号（自动迁移版本目录）
+    // 返回 null 表示成功，否则返回错误消息
+    public async Task<string?> UpdateInfo(string id, PublishRequest req)
     {
-        var list = GetAll();
-        var pkg = list.FirstOrDefault(s => s.Id == id);
-        if (pkg == null)
-            return false;
+        await _lock.WaitAsync();
+        try
+        {
+            var list = GetAll();
+            var pkg = list.FirstOrDefault(s => s.Id == id);
+            if (pkg == null)
+                return $"软件 {id} 不存在";
 
-        // ★ 版本号只能通过重新发布（Publish）变更，因为目录名包含版本号
-        if (!string.IsNullOrWhiteSpace(req.Version) && req.Version != pkg.Version)
-            return false;
+            // 版本号变更：迁移目录 packages/{id}/{旧版本}/ → packages/{id}/{新版本}/
+            var versionChanged =
+                !string.IsNullOrWhiteSpace(req.Version) && req.Version != pkg.Version;
 
-        if (!string.IsNullOrWhiteSpace(req.Name))
-            pkg.Name = req.Name;
-        if (!string.IsNullOrWhiteSpace(req.ExeName))
-            pkg.ExeName = req.ExeName;
-        if (req.Description != null)
-            pkg.Description = req.Description;
+            if (versionChanged)
+            {
+                // 版本号只能包含安全字符，防止路径穿越
+                if (!System.Text.RegularExpressions.Regex.IsMatch(req.Version, @"^[A-Za-z0-9._-]+$"))
+                    return $"版本号包含非法字符: {req.Version}";
 
-        // Scoop 字段更新
-        if (req.Homepage != null)
-            pkg.Homepage = req.Homepage;
-        if (req.License != null)
-            pkg.License = req.License;
-        if (req.Persist != null)
-            pkg.Persist = [.. req.Persist.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)];
+                var oldDir = Path.Combine(_packagesDir, id, pkg.Version);
+                var newDir = Path.Combine(_packagesDir, id, req.Version);
 
-        pkg.UpdatedAt = DateTime.Now;
+                // 目标目录已存在且非空 → 拒绝，避免覆盖已有包
+                if (Directory.Exists(newDir) && Directory.EnumerateFileSystemEntries(newDir).Any())
+                    return $"版本目录已存在且非空: {req.Version}，请先删除该版本或换用其他版本号";
 
-        SaveList(list);
+                if (Directory.Exists(oldDir))
+                {
+                    // 清理可能残留的空目标目录后迁移
+                    if (Directory.Exists(newDir))
+                        Directory.Delete(newDir, recursive: true);
+                    Directory.CreateDirectory(Path.Combine(_packagesDir, id));
+                    Directory.Move(oldDir, newDir);
+                    _logger.LogInformation(
+                        "迁移版本目录 {Old} → {New}",
+                        oldDir, newDir);
+                }
+                // 旧目录不存在时（仅元信息、无包），直接改版本号即可
 
-        // ★ 重新生成 Manifest
-        await GenerateScoopManifestAsync(pkg);
+                pkg.Version = req.Version;
+            }
 
-        return true;
+            if (!string.IsNullOrWhiteSpace(req.Name))
+                pkg.Name = req.Name;
+            if (!string.IsNullOrWhiteSpace(req.ExeName))
+                pkg.ExeName = req.ExeName;
+            if (req.Description != null)
+                pkg.Description = req.Description;
+
+            // Scoop 字段更新
+            if (req.Homepage != null)
+                pkg.Homepage = req.Homepage;
+            if (req.License != null)
+                pkg.License = req.License;
+            if (req.Persist != null)
+                pkg.Persist = [.. req.Persist.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)];
+
+            pkg.UpdatedAt = DateTime.Now;
+
+            SaveList(list);
+
+            // ★ 重新生成 Manifest
+            await GenerateScoopManifestAsync(pkg);
+
+            // 自动提交（版本号变更 / 信息变更均触发）
+            CommitScoopBucketIfChanged($"update {id} v{pkg.Version}");
+
+            return null;
+        }
+        finally
+        {
+            _lock.Release();
+        }
     }
 
     // 删除软件
@@ -173,7 +221,37 @@ public class SoftwareService
 
         list.Remove(pkg);
         SaveList(list);
+
+        // 自动提交（manifest 删除后使远端立即生效）
+        CommitScoopBucketIfChanged($"delete {id}");
+
         return true;
+    }
+
+    /// <summary>
+    /// 重新生成全部 Scoop Manifest。
+    /// 用途：ServerUrl 变更（如从 localhost 改为局域网 IP）后，
+    /// 批量重建所有 manifest，使新地址立即生效，无需逐个重新发布。
+    /// </summary>
+    public async Task<int> RegenerateAllManifestsAsync()
+    {
+        await _lock.WaitAsync();
+        try
+        {
+            var list = GetAll();
+            foreach (var pkg in list)
+                await GenerateScoopManifestAsync(pkg);
+            _logger.LogInformation("已重新生成 {Count} 个 Scoop Manifest", list.Count);
+
+            // 自动提交（ServerUrl 等变更后的批量重建）
+            CommitScoopBucketIfChanged($"regenerate {list.Count} manifests");
+
+            return list.Count;
+        }
+        finally
+        {
+            _lock.Release();
+        }
     }
 
     private void SaveList(List<SoftwarePackage> list)
@@ -183,6 +261,74 @@ public class SoftwareService
             new JsonSerializerOptions { WriteIndented = true }
         );
         File.WriteAllText(_metaFile, json);
+    }
+
+    // ════════════════════════════════════════════
+    //  Scoop Bucket 自动 git commit
+    // ════════════════════════════════════════════
+
+    /// <summary>
+    /// 检查 packages/scoop 仓库的 bucket 目录是否有变更，若有则自动 git commit。
+    /// 目的：上传/更新/删除 manifest 后自动提交，使 git daemon 提供的
+    /// 远端 scoop bucket 立即生效，无需手动运行发布脚本。
+    /// 若 Scoop:AutoCommit=false 则跳过。
+    /// </summary>
+    private void CommitScoopBucketIfChanged(string message)
+    {
+        if (!_autoCommitScoop)
+            return;
+
+        var gitDir = Path.Combine(_packagesDir, "scoop");
+        var gitPath = GitDaemonService.FindGitPath();
+        if (string.IsNullOrEmpty(gitPath))
+        {
+            _logger.LogWarning("自动提交 scoop bucket 失败：未找到 git 可执行文件");
+            return;
+        }
+
+        try
+        {
+            // 1. 检查是否有变更（含未跟踪的新 manifest）
+            var changed = RunGit(gitPath, gitDir, "status", "--porcelain", "bucket/");
+            if (string.IsNullOrWhiteSpace(changed))
+                return; // 无变更，跳过提交
+
+            // 2. 暂存 bucket 目录（只提交 manifest，不碰其他文件）
+            RunGit(gitPath, gitDir, "add", "bucket/");
+
+            // 3. 提交
+            var result = RunGit(gitPath, gitDir, "commit", "-m", message);
+            _logger.LogInformation("自动提交 scoop bucket: {Message}", message);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "自动提交 scoop bucket 失败");
+        }
+    }
+
+    /// <summary>在指定目录执行 git 命令，返回 stdout；非零退出码抛异常</summary>
+    private static string RunGit(string gitPath, string workDir, params string[] args)
+    {
+        var psi = new ProcessStartInfo
+        {
+            FileName = gitPath,
+            WorkingDirectory = workDir,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+        };
+        foreach (var a in args)
+            psi.ArgumentList.Add(a);
+
+        using var p = Process.Start(psi)
+            ?? throw new InvalidOperationException("无法启动 git 进程");
+        var stdout = p.StandardOutput.ReadToEnd();
+        var stderr = p.StandardError.ReadToEnd();
+        p.WaitForExit(10_000);
+        if (p.ExitCode != 0)
+            throw new InvalidOperationException($"git {string.Join(' ', args)} 失败: {stderr}");
+        return stdout;
     }
 
     // ════════════════════════════════════════════

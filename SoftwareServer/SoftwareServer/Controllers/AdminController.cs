@@ -116,13 +116,13 @@ public class AdminController : ControllerBase
         return Ok(results);
     }
 
-    // 仅修改软件信息（不重新上传包）
+    // 仅修改软件信息（不重新上传包，支持修改版本号）
     [HttpPut("software/{id}")]
     public async Task<IActionResult> UpdateInfo(string id, [FromBody] PublishRequest req)
     {
-        var success = await _service.UpdateInfo(id, req);
-        if (!success)
-            return NotFound(new { message = $"软件 {id} 不存在" });
+        var error = await _service.UpdateInfo(id, req);
+        if (error != null)
+            return BadRequest(new { message = error });
         return Ok(new { message = "更新成功" });
     }
 
@@ -134,5 +134,14 @@ public class AdminController : ControllerBase
         if (!success)
             return NotFound(new { message = $"软件 {id} 不存在" });
         return Ok(new { message = "删除成功" });
+    }
+
+    // 重新生成全部 Scoop Manifest（ServerUrl 变更后调用）
+    // 用法: POST /api/admin/scoop/regenerate
+    [HttpPost("scoop/regenerate")]
+    public async Task<IActionResult> RegenerateScoopManifests()
+    {
+        var count = await _service.RegenerateAllManifestsAsync();
+        return Ok(new { message = $"已重新生成 {count} 个 Scoop Manifest", count });
     }
 }
