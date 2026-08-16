@@ -87,7 +87,8 @@ dotnet run -c Release          # 或直接运行 bin\Release\net8.0\SoftwareServ
   "GitDaemon": {                              // git daemon 自动拉起
     "Enabled": true,
     "Port": 9418,
-    "BasePath": "..."                         // 必须是 Windows 原生路径（如 F:\...\packages）
+    "GitPath": "...",                         // 可选：git.exe 绝对路径（服务/LocalSystem 场景必须配置）
+    "BasePath": "..."                         // 必须是 Windows 原生路径（如 D:\...\packages）
   },
   "Kestrel": { "Endpoints": { "Http": { "Url": "http://0.0.0.0:15000" } } },
   "ServerUrl": "http://localhost:15000"       // 写入 manifest 的下载地址（远端消费需改成本机可达地址）
@@ -97,6 +98,8 @@ dotnet run -c Release          # 或直接运行 bin\Release\net8.0\SoftwareServ
 > **注意**：`ServerUrl` 会写入 Scoop manifest 的 `url` 字段。若仅本机使用可保持 `localhost`；局域网/公网消费需改为 `http://<服务器IP>:15000` 并执行 `POST /api/admin/scoop/regenerate` 批量重建 manifest，之后确认 git 仓库已自动 commit。
 
 配置 `Scoop:AutoCommit`（默认 `true`）控制发布/改版/删除后是否自动 git commit。
+
+> **`GitDaemon:GitPath` 何时必须配置**：若以 Windows 服务方式运行（如 shawl），服务默认跑在 `LocalSystem` 账号下，其 PATH **不包含**用户环境（如 `D:\scoop\shims`）。此时 `GitDaemonService` 找不到 git → git daemon 不会启动，局域网 bucket `git://<IP>:9418/scoop` 在 `scoop update` 时就会报 `fatal: unable to connect to 127.0.0.1 ... Connection refused`。显式填入 git 绝对路径即可（如 `D:\scoop\apps\git\current\cmd\git.exe`）；直接双击运行则不受影响（继承用户 PATH）。
 
 ## 📦 Scoop 集成（两条消费路径）
 
@@ -169,6 +172,14 @@ dotnet publish -c Release -o ./publish
 将产物拷贝到部署目录（如 `F:\Applications\SoftwareServer`），**不要覆盖已配置的 `appsettings.json`** 与 `packages/` 数据目录，然后运行 `SoftwareServer.exe`。
 
 > 部署陷阱：源代码目录与部署目录是两个不同位置，运行时的真实配置以**部署目录**的 `appsettings.json` 为准。
+
+### 以 Windows 服务常驻（可选）
+
+```bash
+shawl add --name SoftwareServer --cwd "D:\Applications\SoftwareServer" --restart -- "D:\Applications\SoftwareServer\SoftwareServer.exe"
+```
+
+> 服务默认以 `LocalSystem` 运行，**必须**在部署目录 `appsettings.json` 中配置 `GitDaemon:GitPath`（见上文），否则 git daemon 无法启动、`scoop update` 会报连接被拒。
 
 ### 局域网消费端
 ```bash
