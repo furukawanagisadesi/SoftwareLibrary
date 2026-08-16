@@ -26,6 +26,8 @@ public class ScoopController : ControllerBase
     public IActionResult GetManifest(string appName)
     {
         appName = appName.ToLower().Replace(".json", "");
+        if (!SoftwareService.IsValidId(appName))
+            return NotFound(new { message = $"软件 {appName} 的 manifest 不存在" });
         var path = _service.GetScoopManifestPath(appName);
         if (path == null)
             return NotFound(new { message = $"软件 {appName} 的 manifest 不存在" });

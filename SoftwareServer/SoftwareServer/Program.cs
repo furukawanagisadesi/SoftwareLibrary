@@ -61,4 +61,22 @@ app.MapControllers();
 
 app.UseStaticFiles();
 
+// ── 单实例互斥：防止双击 + 服务（或重复启动）同时运行导致端口/数据冲突 ──
+using var singleInstance = new Mutex(initiallyOwned: false, @"Global\SoftwareServerInstance", out _);
+bool acquired = false;
+try
+{
+    acquired = singleInstance.WaitOne(TimeSpan.Zero);
+}
+catch (AbandonedMutexException)
+{
+    acquired = true; // 上一实例异常退出未释放，本实例接管
+}
+
+if (!acquired)
+{
+    app.Logger.LogWarning("检测到已有 SoftwareServer 实例在运行，本实例退出");
+    return;
+}
+
 app.Run();

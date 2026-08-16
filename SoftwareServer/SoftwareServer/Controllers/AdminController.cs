@@ -42,11 +42,17 @@ public class AdminController : ControllerBase
     {
         id = id.ToLower();
 
+        if (!SoftwareService.IsValidId(id))
+            return BadRequest(new { message = "软件 ID 只能包含字母、数字、点、下划线、短横线" });
+
         if (zipFile == null || zipFile.Length == 0)
             return BadRequest(new { message = "请上传 zip 文件" });
 
         if (string.IsNullOrWhiteSpace(version))
             return BadRequest(new { message = "版本号不能为空" });
+
+        if (!SoftwareService.IsValidVersion(version))
+            return BadRequest(new { message = "版本号包含非法字符" });
 
         if (string.IsNullOrWhiteSpace(exeName))
             return BadRequest(new { message = "ExeName 不能为空" });
@@ -62,8 +68,15 @@ public class AdminController : ControllerBase
             Persist = persist,
         };
 
-        var pkg = await _service.PublishAsync(id, zipFile, req);
-        return Ok(pkg);
+        try
+        {
+            var pkg = await _service.PublishAsync(id, zipFile, req);
+            return Ok(pkg);
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidDataException)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
     }
 
     // 批量发布（多个 zip，文件名即软件ID和启动EXE名，版本默认 1.0）
@@ -120,6 +133,8 @@ public class AdminController : ControllerBase
     [HttpPut("software/{id}")]
     public async Task<IActionResult> UpdateInfo(string id, [FromBody] PublishRequest req)
     {
+        if (!SoftwareService.IsValidId(id))
+            return BadRequest(new { message = "软件 ID 包含非法字符" });
         var error = await _service.UpdateInfo(id, req);
         if (error != null)
             return BadRequest(new { message = error });
@@ -130,6 +145,8 @@ public class AdminController : ControllerBase
     [HttpDelete("software/{id}")]
     public IActionResult Delete(string id)
     {
+        if (!SoftwareService.IsValidId(id))
+            return BadRequest(new { message = "软件 ID 包含非法字符" });
         var success = _service.Delete(id);
         if (!success)
             return NotFound(new { message = $"软件 {id} 不存在" });

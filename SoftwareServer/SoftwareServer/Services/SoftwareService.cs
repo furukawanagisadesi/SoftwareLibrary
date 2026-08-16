@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -27,6 +28,16 @@ public class SoftwareService
         _metaFile = Path.Combine(_packagesDir, "software-list.json");
         Directory.CreateDirectory(_packagesDir);
     }
+
+    /// <summary>校验软件 ID（仅允许字母数字与 . _ -，防止路径穿越）</summary>
+    public static bool IsValidId(string id) =>
+        !string.IsNullOrWhiteSpace(id)
+        && System.Text.RegularExpressions.Regex.IsMatch(id, @"^[A-Za-z0-9][A-Za-z0-9._-]*$");
+
+    /// <summary>校验版本号（仅允许字母数字与 . _ -，防止路径穿越）</summary>
+    public static bool IsValidVersion(string version) =>
+        !string.IsNullOrWhiteSpace(version)
+        && System.Text.RegularExpressions.Regex.IsMatch(version, @"^[A-Za-z0-9._-]+$");
 
     // 读取所有软件清单
     public List<SoftwarePackage> GetAll()
@@ -66,6 +77,11 @@ public class SoftwareService
         await _lock.WaitAsync();
         try
         {
+            if (!IsValidId(id))
+                throw new ArgumentException("软件 ID 只能包含字母、数字、点、下划线、短横线");
+            if (!IsValidVersion(req.Version))
+                throw new ArgumentException("版本号包含非法字符");
+
             // ★ 改为目录结构: packages/{id}/{version}/{id}.zip
             var appDir = Path.Combine(_packagesDir, id, req.Version);
             Directory.CreateDirectory(appDir);
@@ -75,6 +91,20 @@ public class SoftwareService
             await using (var stream = new FileStream(zipPath, FileMode.Create))
             {
                 await zipFile.CopyToAsync(stream);
+            }
+
+            // 校验 zip 完整性：不是合法 zip / 空包则拒绝并清理
+            try
+            {
+                using var archive = ZipFile.OpenRead(zipPath);
+                if (archive.Entries.Count == 0)
+                    throw new InvalidDataException("压缩包内没有文件");
+            }
+            catch
+            {
+                if (Directory.Exists(appDir))
+                    Directory.Delete(appDir, recursive: true);
+                throw;
             }
 
             // 更新清单
@@ -131,6 +161,9 @@ public class SoftwareService
     // 返回 null 表示成功，否则返回错误消息
     public async Task<string?> UpdateInfo(string id, PublishRequest req)
     {
+        if (!IsValidId(id))
+            return $"软件 ID 包含非法字符: {id}";
+
         await _lock.WaitAsync();
         try
         {
@@ -208,6 +241,9 @@ public class SoftwareService
     // 删除软件
     public bool Delete(string id)
     {
+        if (!IsValidId(id))
+            throw new ArgumentException("软件 ID 包含非法字符");
+
         var list = GetAll();
         var pkg = list.FirstOrDefault(s => s.Id == id);
         if (pkg == null)
@@ -301,7 +337,10 @@ public class SoftwareService
             // 2. 暂存 bucket 目录（只提交 manifest，不碰其他文件）
             RunGit(gitPath, gitDir, "add", "bucket/");
 
-            // 3. 提交
+            // 3. 确保仓库有提交身份（服务/LocalSystem 场景可能无全局 user.name/email）
+            EnsureGitIdentity(gitPath, gitDir);
+
+            // 4. 提交
             var result = RunGit(gitPath, gitDir, "commit", "-m", message);
             _logger.LogInformation("自动提交 scoop bucket: {Message}", message);
         }
@@ -336,14 +375,37 @@ public class SoftwareService
         return stdout;
     }
 
+    /// <summary>读取本地 git 配置；key 不存在时返回 null（git config --get 退出码为 1）</summary>
+    private static string? GetGitConfig(string gitPath, string workDir, string key)
+    {
+        try
+        {
+            var value = RunGit(gitPath, workDir, "config", "--get", key);
+            return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>仓库缺失 user.name / user.email 时写入本地配置，保证自动 commit 可用</summary>
+    private static void EnsureGitIdentity(string gitPath, string workDir)
+    {
+        if (GetGitConfig(gitPath, workDir, "user.name") == null)
+            RunGit(gitPath, workDir, "config", "user.name", "SoftwareServer");
+        if (GetGitConfig(gitPath, workDir, "user.email") == null)
+            RunGit(gitPath, workDir, "config", "user.email", "softwareserver@localhost");
+    }
+
     // ════════════════════════════════════════════
     //  Scoop Manifest 生成
     // ════════════════════════════════════════════
 
-    private static string ComputeSha256(string filePath)
+    private static async Task<string> ComputeSha256Async(string filePath)
     {
-        using var stream = File.OpenRead(filePath);
-        var hash = SHA256.HashData(stream);
+        await using var stream = File.OpenRead(filePath);
+        var hash = await SHA256.HashDataAsync(stream);
         return Convert.ToHexString(hash).ToLowerInvariant();
     }
 
@@ -358,7 +420,7 @@ public class SoftwareService
         Directory.CreateDirectory(bucketDir);
 
         var zipPath = Path.Combine(_packagesDir, pkg.Id, pkg.Version, pkg.ZipFileName);
-        var sha256 = ComputeSha256(zipPath);
+        var sha256 = await ComputeSha256Async(zipPath);
 
         // 构造 shortcuts: 只有 ExeName 不为空才生成
         object? shortcuts = null;
