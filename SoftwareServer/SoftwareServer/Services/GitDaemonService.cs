@@ -33,7 +33,10 @@ public class GitDaemonService : IHostedService, IDisposable
         try
         {
             // ── 检查 1: git 是否可用 ──────────────────────────────
-            var gitPath = FindGitPath();
+            // 优先使用配置 GitDaemon:GitPath（服务场景下 PATH 可能不含 scoop/git）
+            var gitPath = _config["GitDaemon:GitPath"];
+            if (string.IsNullOrWhiteSpace(gitPath) || !File.Exists(gitPath))
+                gitPath = FindGitPath();
             if (string.IsNullOrEmpty(gitPath))
             {
                 _logger.LogWarning("未找到 git 可执行文件，git daemon 无法启动");
@@ -103,15 +106,26 @@ public class GitDaemonService : IHostedService, IDisposable
     /// <summary>查找 git 可执行文件（git.exe / git），供 git daemon 与自动提交共用</summary>
     public static string? FindGitPath()
     {
-        // 1. 常见安装路径
-        string[] candidates =
+        var candidates = new List<string>
         {
+            // 1. 常见安装路径
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Git", "cmd", "git.exe"),
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "Git", "cmd", "git.exe"),
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Git", "bin", "git.exe"),
+            // 2. scoop 默认安装位置
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "scoop", "apps", "git", "current", "cmd", "git.exe"),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "scoop", "shims", "git.exe"),
             "git.exe",
             "git",
         };
+
+        // 3. SCOOP 环境变量指定的安装根目录（可能不在用户目录下）
+        var scoopRoot = Environment.GetEnvironmentVariable("SCOOP");
+        if (!string.IsNullOrWhiteSpace(scoopRoot))
+        {
+            candidates.Insert(0, Path.Combine(scoopRoot, "apps", "git", "current", "cmd", "git.exe"));
+            candidates.Insert(0, Path.Combine(scoopRoot, "shims", "git.exe"));
+        }
 
         foreach (var c in candidates)
         {

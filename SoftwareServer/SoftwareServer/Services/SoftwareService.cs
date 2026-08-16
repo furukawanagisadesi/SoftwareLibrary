@@ -9,6 +9,7 @@ namespace SoftwareServer.Services;
 
 public class SoftwareService
 {
+    private readonly IConfiguration _config;
     private readonly string _packagesDir;
     private readonly string _metaFile;
     private readonly string _serverUrl;
@@ -17,6 +18,7 @@ public class SoftwareService
 
     public SoftwareService(IConfiguration config, ILogger<SoftwareService> logger)
     {
+        _config = config;
         _logger = logger;
         _packagesDir =
             config["Storage:PackagesDir"] ?? Path.Combine(AppContext.BaseDirectory, "packages");
@@ -279,7 +281,10 @@ public class SoftwareService
             return;
 
         var gitDir = Path.Combine(_packagesDir, "scoop");
-        var gitPath = GitDaemonService.FindGitPath();
+        // 优先使用配置 GitDaemon:GitPath（服务场景下 PATH 可能不含 scoop/git）
+        var gitPath = _config["GitDaemon:GitPath"];
+        if (string.IsNullOrWhiteSpace(gitPath) || !File.Exists(gitPath))
+            gitPath = GitDaemonService.FindGitPath();
         if (string.IsNullOrEmpty(gitPath))
         {
             _logger.LogWarning("自动提交 scoop bucket 失败：未找到 git 可执行文件");
