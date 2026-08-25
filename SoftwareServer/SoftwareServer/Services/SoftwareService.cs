@@ -1,5 +1,8 @@
 using System.Diagnostics;
 using System.IO.Compression;
+using System.Net;
+using System.Net.NetworkInformation;
+using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -23,10 +26,76 @@ public class SoftwareService
         _logger = logger;
         _packagesDir =
             config["Storage:PackagesDir"] ?? Path.Combine(AppContext.BaseDirectory, "packages");
-        _serverUrl = (config["ServerUrl"] ?? "http://localhost:15000").TrimEnd('/');
+        _serverUrl = NormalizeServerUrl(config["ServerUrl"] ?? "http://localhost:15000");
         _autoCommitScoop = config.GetValue("Scoop:AutoCommit", true);
         _metaFile = Path.Combine(_packagesDir, "software-list.json");
         Directory.CreateDirectory(_packagesDir);
+    }
+
+    /// <summary>
+    /// 将配置的 ServerUrl 中的 localhost / 127.0.0.1 替换为本机局域网 IP。
+    /// 目的：生成的 Scoop Manifest 使用局域网地址，局域网内其他机器（如 scoop 客户端）可直接下载。
+    /// </summary>
+    private static string NormalizeServerUrl(string serverUrl)
+    {
+        serverUrl = serverUrl.TrimEnd('/');
+        var lanIp = GetLocalLanIp();
+        if (string.IsNullOrWhiteSpace(lanIp))
+            return serverUrl;
+        return serverUrl
+            .Replace("://localhost", $"://{lanIp}", StringComparison.OrdinalIgnoreCase)
+            .Replace("://127.0.0.1", $"://{lanIp}", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>获取本机局域网 IPv4 地址（优先选择带默认网关的网卡，即局域网对外网卡）</summary>
+    private static string GetLocalLanIp()
+    {
+        try
+        {
+            foreach (var ni in NetworkInterface.GetAllNetworkInterfaces())
+            {
+                if (ni.OperationalStatus != OperationalStatus.Up)
+                    continue;
+                if (ni.NetworkInterfaceType == NetworkInterfaceType.Loopback
+                    || ni.NetworkInterfaceType == NetworkInterfaceType.Tunnel)
+                    continue;
+                // 无默认网关的网卡（如虚拟网卡）视为非局域网接口
+                if (ni.GetIPProperties().GatewayAddresses.Count == 0)
+                    continue;
+                foreach (var ua in ni.GetIPProperties().UnicastAddresses)
+                {
+                    var addr = ua.Address;
+                    if (addr.AddressFamily == AddressFamily.InterNetwork
+                        && !IPAddress.IsLoopback(addr))
+                    {
+                        return addr.ToString();
+                    }
+                }
+            }
+            // 回退：任意非环回 IPv4
+            foreach (var ni in NetworkInterface.GetAllNetworkInterfaces())
+            {
+                if (ni.OperationalStatus != OperationalStatus.Up)
+                    continue;
+                if (ni.NetworkInterfaceType == NetworkInterfaceType.Loopback
+                    || ni.NetworkInterfaceType == NetworkInterfaceType.Tunnel)
+                    continue;
+                foreach (var ua in ni.GetIPProperties().UnicastAddresses)
+                {
+                    var addr = ua.Address;
+                    if (addr.AddressFamily == AddressFamily.InterNetwork
+                        && !IPAddress.IsLoopback(addr))
+                    {
+                        return addr.ToString();
+                    }
+                }
+            }
+        }
+        catch
+        {
+            // 忽略，返回 localhost 作为兜底
+        }
+        return "localhost";
     }
 
     /// <summary>校验软件 ID（仅允许字母数字与 . _ -，防止路径穿越）</summary>
@@ -481,10 +550,10 @@ public class SoftwareService
     }
 }
 
-/// <summary>Scoop 应用列表条目</summary>
-public class ScoopAppInfo
-{
-    public string Name { get; set; } = "";
-    public string Version { get; set; } = "";
-    public string Description { get; set; } = "";
-}
+    /// <summary>Scoop 应用列表条目</summary>
+    public class ScoopAppInfo
+    {
+        public string Name { get; set; } = "";
+        public string Version { get; set; } = "";
+        public string Description { get; set; } = "";
+    }
