@@ -80,9 +80,11 @@ dotnet run -c Release          # 或直接运行 bin\Release\net8.0\SoftwareServ
 
 ## ⚙️ 配置说明（appsettings.json）
 
+参考 `appsettings.Example.json` 进行配置：
+
 ```json
 {
-  "AdminKey": "admin",                        // 管理后台密钥（请求头 X-Admin-Key）
+  "AdminKey": "your-admin-key-here",          // 管理后台密钥（请求头 X-Admin-Key），请修改为强密码
   "Storage": { "PackagesDir": "..." },        // 软件包根目录（含 packages/scoop git 仓库）
   "GitDaemon": {                              // git daemon 自动拉起
     "Enabled": true,
@@ -99,7 +101,7 @@ dotnet run -c Release          # 或直接运行 bin\Release\net8.0\SoftwareServ
 
 配置 `Scoop:AutoCommit`（默认 `true`）控制发布/改版/删除后是否自动 git commit。
 
-> **`GitDaemon:GitPath` 何时必须配置**：若以 Windows 服务方式运行（如 shawl），服务默认跑在 `LocalSystem` 账号下，其 PATH **不包含**用户环境（如 `D:\scoop\shims`）。此时 `GitDaemonService` 找不到 git → git daemon 不会启动，局域网 bucket `git://<IP>:9418/scoop` 在 `scoop update` 时就会报 `fatal: unable to connect to 127.0.0.1 ... Connection refused`。显式填入 git 绝对路径即可（如 `D:\scoop\apps\git\current\cmd\git.exe`）；直接双击运行则不受影响（继承用户 PATH）。
+> **`GitDaemon:GitPath` 何时必须配置**：若以 Windows 服务方式运行（如 shawl），服务默认跑在 `LocalSystem` 账号下，其 PATH **不包含**用户环境（如 `D:\scoop\shims`）。此时 `GitDaemonService` 找不到 git → git daemon 不会启动，局域网 bucket `git://<IP>:9418/scoop` 在 `scoop update` 时就会报 `fatal: unable to connect to 127.0.0.1 ... Connection refused`。显式填入 git 绝对路径即可（如 `C:\Program Files\Git\cmd\git.exe`）；直接双击运行则不受影响（继承用户 PATH）。
 
 ## 📦 Scoop 集成（两条消费路径）
 
@@ -107,7 +109,7 @@ dotnet run -c Release          # 或直接运行 bin\Release\net8.0\SoftwareServ
 Server 启动时自动拉起 git daemon，并将发布的 manifest 写入 `packages/scoop`（一个 git 仓库），随后自动 `git commit`：
 
 ```bash
-scoop bucket add myapps git://192.168.16.52:9418/scoop
+scoop bucket add myapps git://<服务器IP>:9418/scoop
 scoop install myapps/<app>
 scoop update myapps           # 注意：update 传 bucket 名不是 app 名
 ```
@@ -183,8 +185,8 @@ shawl add --name SoftwareServer --cwd "D:\Applications\SoftwareServer" --restart
 
 ### 局域网消费端
 ```bash
-git remote add / set-url origin git://192.168.16.52:9418/scoop   # 已 clone 的分支
-scoop bucket add myapps git://192.168.16.52:9418/scoop            # 新装
+git remote add / set-url origin git://<服务器IP>:9418/scoop   # 已 clone 的分支
+scoop bucket add myapps git://<服务器IP>:9418/scoop            # 新装
 ```
 
 ## ⚠️ 已知注意事项
